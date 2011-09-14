@@ -1,11 +1,11 @@
 \name{multiPIM}
 \alias{multiPIM}
 \title{Estimate Variable Importances for Multiple Exposures and Outcomes}
-\description{The parameter of interest is a type of causal attributable risk.  One effect measure (and a corresponding plug-in standard error) will be calculated for each exposure-outcome pair, using either an IPCW estimator or its double-robust extension (the default).  PIM stands for Population Intervention Model.}
+\description{The parameter of interest is a type of causal attributable risk.  One effect measure (and a corresponding plug-in standard error) will be calculated for each exposure-outcome pair. The default is to use a Targeted Maximum Likelihood Estimator (TMLE). The other available estimators are Inverse Probability of Censoring Weighted (IPCW), Double-Robust IPCW (DR-IPCW), and Graphical Computation (G-COMP) estimators. PIM stands for Population Intervention Model.}
 \usage{multiPIM(Y, A, W = NULL,
-         estimator = c("DR-IPCW", "IPCW"),
-         g.method = "sl", g.sl.cands = default.bin.cands,
-         g.num.folds = 5, g.num.splits = 1,
+         estimator = c("TMLE", "DR-IPCW", "IPCW", "G-COMP"),
+         g.method = "main.terms.logistic", g.sl.cands = NULL,
+         g.num.folds = NULL, g.num.splits = NULL,
          Q.method = "sl", Q.sl.cands = "default",
          Q.num.folds = 5, Q.num.splits = 1,
          Q.type = NULL,
@@ -16,28 +16,30 @@
          check.input = TRUE,
          verbose = FALSE,
          extra.cands = NULL,
+         standardize = TRUE,
          \dots)}
 \arguments{
   \item{Y}{a data frame of outcomes containing only numeric (integer or double) values. See details for the default method of determining, based on the values in \code{Y}, which regression types to allow for modelling Q. Must have unique names.}
   \item{A}{a data frame containing binary exposure variables. \emph{Binary} means that all values must be either 0 (indicating unexposed, or part of target group) or 1 (indicating exposed or not part of target group). Must have unique names.}
-  \item{W}{an optional data frame containing possible confounders of the effects of the variables in \code{A} on the variables in \code{Y}. May contain only numeric (integer or double) values. Must be left as \code{NULL} if not required. See details.}
-  \item{estimator}{the estimator to be used. The default is \code{"DR-IPCW"}, for the Double-Robust Inverse Probability of Censoring-Weighted estimator. Alternatively, one may specify \code{"IPCW"}, for the regular IPCW estimator. In the latter case, all arguments which begin with the letter Q are ignored, since only g (the regression of each exposure on possible confounders) needs to be modeled in this case. Note that the default value of this argument is likely to change in future versions of multiPIM, since the plan is to add a targeted maximum likelihood estimator to the package.}
-  \item{g.method}{a length one character vector indicating the regression method to use in modelling g. The default value, \code{"sl"}, indicates that super learning should be used to model g. Other possible values to use are: one of the elements of the vector \code{\link{all.bin.cands}}, or, if \code{extra.cands} is supplied, one of the names of the \code{extra.cands} list of functions.}
-  \item{g.sl.cands}{character vector of length \eqn{\geq 2}{>= 2} indicating the candidate algorithms that the super learner fits for g should use. The possible values may be taken from the vector \code{\link{all.bin.cands}}, or from the names of the \code{extra.cands} list of functions, if it is supplied. The default is to use those candidates listed in the vector \code{\link{default.bin.cands}}. Ignored if \code{g.method} is not \code{"sl"}.}
-  \item{g.num.folds}{the number of folds to use in cross-validating the super learner fit for g (i.e. the v for v-fold cross-validation). Ignored if \code{g.method} is not \code{"sl"}.}
-  \item{g.num.splits}{the number of times to randomly split the data into \code{g.num.folds} folds in cross-validating the super learner fit for g. Cross-validation results will be averaged over all splits. Ignored if \code{g.method} is not \code{"sl"}.}
+  \item{W}{an optional data frame containing possible confounders of the effects of the variables in \code{A} on the variables in \code{Y}. No effect measures will be calculated for these variables. May contain numeric (integer or double), or factor values. Must be left as \code{NULL} if not required. See details.}
+  \item{estimator}{the estimator to be used. The default is \code{"TMLE"}, for the targeted maximum likelihood estimator. Alternatively, one may specify \code{"DR-IPCW"}, for the Double-Robust Inverse Probability of Censoring-Weighted estimator, or \code{"IPCW"}, for the regular IPCW estimator, or \code{"G-COMP"} for the Graphical Computation estimator. If the regular IPCW estimator is selected, all arguments which begin with the letter Q are ignored, since only g (the regression of each exposure on possible confounders) needs to be modeled in this case. Similarly, if the G-COMP estimator is selected, all arguments which begin with the letter g, as well as the truncate argument, will be ignored, since only Q needs to be modeled in this case. Note: an additional characteristic of the G-COMP estimator is that there are no plug-in standard errors available. If you want to use G-COMP and you need standard errors, the \code{multiPIMboot} function is available and will provide bootstrap standard errors.}
+  \item{g.method}{a length one character vector indicating the regression method to use in modelling g. The default value, \code{"main.terms.logistic"}, is meant to be used with the default TMLE estimator. If a different estimator is used, it is recommended to use super learning by specifying \code{"sl"}. In this case, the arguments \code{g.sl.cands}, \code{g.num.folds} and \code{g.num.splits} must also be specified. Other possible values for the \code{g.method} argument are: one of the elements of the vector \code{\link{all.bin.cands}}, or, if \code{extra.cands} is supplied, one of the names of the \code{extra.cands} list of functions. Ignored if \code{estimator} is \code{"G-COMP"}.}
+  \item{g.sl.cands}{character vector of length \eqn{\geq 2}{>= 2} indicating the candidate algorithms that the super learner fits for g should use. The possible values may be taken from the vector \code{\link{all.bin.cands}}, or from the names of the \code{extra.cands} list of functions, if it is supplied. Ignored if \code{estimator} is \code{"G-COMP"}. or if \code{g.method} is not \code{"sl"}. NOTE: The TMLE estimator is recommended, but if one is using either of the IPCW estimators, a reasonable choice is to specify \code{g.method = "sl"} and \code{g.sl.cands = default.bin.cands}.}
+  \item{g.num.folds}{the number of folds to use in cross-validating the super learner fit for g (i.e. the v for v-fold cross-validation). Ignored if \code{estimator} is \code{"G-COMP"}, or if \code{g.method} is not \code{"sl"}.}
+  \item{g.num.splits}{the number of times to randomly split the data into \code{g.num.folds} folds in cross-validating the super learner fit for g. Cross-validation results will be averaged over all splits. Ignored if \code{estimator} is \code{"G-COMP"}, or if \code{g.method} is not \code{"sl"}.}
   \item{Q.method}{character vector of length 1. The regression method to use in modelling Q. See details to find out which values are allowed. The default value, \code{"sl"}, indicates that super learning should be used for modelling Q. Ignored if \code{estimator} is \code{"IPCW"}.}
   \item{Q.sl.cands}{either of the length 1 character values \code{"default"} or \code{"all"} or a character vector of length \eqn{\geq 2}{>= 2} containing elements of either \code{all.bin.cands} or of \code{all.cont.cands}, or of the names of the \code{extra.cands} list of functions, if it is supplied. See details. Ignored if \code{estimator} is \code{"IPCW"} or if \code{Q.method} is not \code{"sl"}.}
   \item{Q.num.folds}{the number of folds to use in cross-validating the super learner fit for Q (i.e. the v for v-fold cross-validation). Ignored if \code{estimator} is \code{"IPCW"} or if \code{Q.method} is not \code{"sl"}.}
   \item{Q.num.splits}{the number of times to randomly split the data into \code{Q.num.folds} folds in cross-validating the super learner fit for Q. Ignored if \code{estimator} is \code{"IPCW"} or if \code{Q.method} is not \code{"sl"}.}
   \item{Q.type}{either \code{NULL} or a length 1 character vector (which must be either \code{"binary.outcome"} or \code{"continuous.outcome"}). This provides a way to override the default mechanism for deciding which candidates will be allowed for modeling Q (see details). Ignored if \code{estimator} is \code{"IPCW"}.}
   \item{adjust.for.other.As}{a single logical value indicating whether the other columns of \code{A} should be included (for \code{TRUE}) or not (for \code{FALSE}) in the g and Q models used to calculate the effect of each column of \code{A} on each column of \code{Y}. See details. Ignored if \code{A} has only one column.}
-  \item{truncate}{either \code{FALSE}, or a single number greater than 0 and less than 0.5 at which the values of g(0, W) should be truncated in order to avoid instability of the estimator.}
+  \item{truncate}{either \code{FALSE}, or a single number greater than 0 and less than 0.5 at which the values of g(0, W) should be truncated in order to avoid instability of the estimator. Ignored if \code{estimator} is \code{"G-COMP"}.}
   \item{return.final.models}{single logical value indicating whether final g and Q models should be returned by the function (in the slots \code{g.final.models} and \code{Q.final.models}). Default is \code{TRUE}. If memory is a concern, you will probably want to set this to FALSE.}
   \item{na.action}{currently ignored. If any of \code{Y}, \code{A} or (a non-null) \code{W} has missing values, \code{multiPIM} will throw an error.}
   \item{check.input}{a single logical value indicating whether all of the input to the function should be subjected to strict error checking. \code{FALSE} is not recommended.}
   \item{verbose}{a single logical value indicating whether messages about the progress of the evaluation should be printed out. Some of the candidate algorithms may print messages even when \code{verbose} is set to \code{FALSE}.}
-  \item{extra.cands}{A named list of functions. This argument provides a way for the user to specify his or her own functions to use either as stand-alone regression methods, or as candidates for a super learner. See details.}
+  \item{extra.cands}{a named list of functions. This argument provides a way for the user to specify his or her own functions to use either as stand-alone regression methods, or as candidates for a super learner. See details.}
+  \item{standardize}{should all predictor variables be standardized before certain regression methods are run. Passed to all candidates, but only used by some (at this point, lars, penalized.bin and penalized.cont)}
   \item{\dots}{currently ignored.}
 }
 
@@ -58,7 +60,7 @@ exposure). For example, in the case of a binary outcome, a parameter
 estimate for exposure x and outcome y of -0.03 could be interpreted
 as follows: the effect of an intervention in which the entire population
 was set to exposure x = 0 would be to reduce the level of outcome y
-by 3\%.
+by 3 percentage points.
 
 If \code{check.input} is \code{TRUE} (which is the default and is highly
 recommended), all of the arguments will be checked to make sure they
@@ -76,8 +78,7 @@ columns of these data frames, or if any of the names cannot be used in a
 \code{formula} (for example, because it begins with a number and not a
 letter).
 
-When \code{estimator} is \code{"DR-IPCW"} and \code{Q.type} is
-\code{NULL} (the defaults), the regression methods which will be allowed
+By default, the regression methods which will be allowed
 for fitting models for Q will be determined from the contents of
 \code{Y} as follows: if all values in Y are either 0 or 1 (i.e. all
 outcomes are binary), then \dQuote{logistic}-type regression methods
@@ -94,15 +95,15 @@ binaryness.
 
 The values allowed for \code{Q.method} (which should have length 1) are:
 either \code{"sl"} if one would like to use super learning, or one of the
-elements of the vector \code{all.bin.cands} (for the binary outcome case),
-or of \code{all.cont.cands} (for the continuous outcome case), if one would
+elements of the vector \code{\link{all.bin.cands}} (for the binary outcome case),
+or of \code{\link{all.cont.cands}} (for the continuous outcome case), if one would
 like to use only a
 particular regression method for all modelling of Q. If \code{Q.method}
 is given as \code{"sl"}, then the candidates used by the super learner
 will be determined from the value of \code{Q.sl.cands}. If the value of
 \code{Q.sl.cands} is \code{"default"}, then the candidates listed in either
 \code{\link{default.bin.cands}} or \code{\link{default.cont.cands}} will
-be used. If the value of Q.sl.cands is \code{"all"}, then the candidates
+be used. If the value of \code{Q.sl.cands} is \code{"all"}, then the candidates
 listed in either \code{\link{all.bin.cands}} or \code{\link{all.cont.cands}}
 will be used. The function will automatically choose the candidates which
 correspond to the correct outcome type (binary or continuous). Alternatively,
@@ -139,7 +140,7 @@ cause any extra candidates to be used.
 \value{
 Returns an object of class \code{"multiPIM"} with the following elements:
   \item{param.estimates}{a matrix of dimensions \code{ncol(A)} by \code{ncol(Y)} with \code{rownames} equal to \code{names(A)} and \code{colnames} equal to \code{names(Y)}, with each element being the estimated causal attributable risk for the exposure given by its row name vs. the outcome given by its column name.}
-  \item{plug.in.stand.errs}{a matrix with the same dimensions as \code{param.estimates} containing the corresponding plug-in standard errors of the parameter estimates. These are obtained from the influence curve.}
+  \item{plug.in.stand.errs}{a matrix with the same dimensions as \code{param.estimates} containing the corresponding plug-in standard errors of the parameter estimates. These are obtained from the influence curve. Note: plug-in standard errors are not available for \code{estimator = "G-COMP"}. This field will be set to \code{NA} in this case.}
   \item{call}{a copy of the call to \code{multiPIM} which generated this object.}
   \item{num.exposures}{this will be set to \code{ncol(A)}.}
   \item{num.outcomes}{this will be set to \code{ncol(Y)}.}
@@ -161,20 +162,25 @@ Returns an object of class \code{"multiPIM"} with the following elements:
   \item{Q.num.splits}{the number of splits used for cross validation in the super learner for Q.  Will be \code{NA} if \code{double.robust} was \code{FALSE} or if \code{Q.method} was not \code{"sl"}.}
   \item{Q.type}{either \code{"continuous.outcome"} or \code{"binary.outcome"}, depending on the contents of \code{Y} or on the value of the \code{Q.type} argument, if supplied.}
   \item{adjust.for.other.As}{logical value indicating whether the other columns of \code{A} were included in models used to calculate the effect of each column of \code{A} on each column of \code{Y}. Will be set to \code{NA} when \code{A} has only one column.}
-  \item{truncate}{the value of the \code{truncate} argument.}
-  \item{truncation.occured}{logical value indicating whether it was necessary to trunctate (always \code{FALSE} when \code{truncate} is \code{FALSE}).} 
+  \item{truncate}{the value of the \code{truncate} argument. Will be set to NA if estimator was \code{"G-COMP"}.}
+  \item{truncation.occured}{logical value indicating whether it was necessary to trunctate. \code{FALSE} when \code{truncate} is \code{FALSE}. Will be set to NA if estimator was \code{"G-COMP"}.}
+  \item{standardize}{the value of the \code{standardize} argument.}
   \item{boot.param.array}{this slot will be \code{NULL} for objects returned by the \code{multiPIM} function. See \code{\link{multiPIMboot}} for details on what this slot is actually used for.}
 }
 
 \author{Stephan Ritter, with design contributions from Alan Hubbard and Nicholas Jewell.}
 
 \references{
+Ritter, Stephan J.,  Jewell, Nicholas P. and Hubbard, Alan E. (2011) \dQuote{Variable Importance Analysis with the multiPIM R Package.} \emph{U.C. Berkeley Division of Biostatistics Working Paper Series}, Working Paper 286.
+\url{http://www.bepress.com/ucbbiostat/paper286}
+
 Hubbard, Alan E. and van der Laan, Mark J. (2008) \dQuote{Population Intervention Models in Causal Inference.} \emph{Biometrika} \bold{95}, 1: 35--47.
 
-Young, Jessica G. (2007) \emph{Statistical Methods for Complicated Current Status and High-Dimensional Data Structures with Applications in Environmental Epidemiology}, U.C. Berkeley Ph.D. Thesis, Chapter 4.
+Young, Jessica G., Hubbard, Alan E., Eskenazi, Brenda, and Jewell, Nicholas P. (2009) \dQuote{A Machine-Learning Algorithm for Estimating and Ranking the Impact of Environmental Risk Factors in Exploratory Epidemiological Studies.} \emph{U.C. Berkeley Division of Biostatistics Working Paper Series}, Working Paper 250.
+\url{http://www.bepress.com/ucbbiostat/paper250}
 
-Ritter, Stephan J., Hubbard, Alan E. and Jewell, Nicholas P. Technical report to appear soon in \emph{U.C. Berkeley Division of Biostatistics Working Paper Series}.
-\url{http://www.bepress.com/ucbbiostat/}
+van der Laan, Mark J. and Rose, Sherri (2011) \emph{Targeted Learning}, Springer, New York.
+ISBN: 978-1441997814
 
 Sinisi, Sandra E., Polley, Eric C., Petersen, Maya L, Rhee, Soo-Yon and van der Laan, Mark J. (2007) \dQuote{Super learning: An Application to the Prediction of HIV-1 Drug Resistance.} \emph{Statistical Applications in Genetics and Molecular Biology} \bold{6}, 1: article 7.
 \url{http://www.bepress.com/sagmb/vol6/iss1/art7}
@@ -184,11 +190,11 @@ van der Laan, Mark J., Polley, Eric C. and Hubbard, Alan E. (2007) \dQuote{Super
 }
 
 \seealso{
-\code{\link{multiPIMboot}} for running multiPIM with automatic bootstrapping.
+\code{\link{multiPIMboot}} for running \code{multiPIM} with automatic bootstrapping to get standard errors.
 
 \code{\link{summary.multiPIM}} for printing summaries of the results.
 
-\code{\link{Candidates}} to see which candidates are currently available, and for information on writing user-defined candidates.
+\code{\link{Candidates}} to see which candidates are currently available, and for information on writing user-defined super learner candidates and regression methods.
 }
 
 \examples{

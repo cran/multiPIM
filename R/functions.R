@@ -34,9 +34,9 @@
 ## all.bin.cands and all.cont.cands
 
 all.bin.cands <- c("polyclass", "penalized.bin", "main.terms.logistic",
-                   "randomForest.bin", "rpart.bin")
-all.cont.cands <- c("polymars", "lars", "main.terms.linear",
-                    "randomForest.cont", "rpart.cont", "penalized.cont")
+                   "rpart.bin")
+all.cont.cands <- c("polymars", "lars", "main.terms.linear", "penalized.cont",
+                    "rpart.cont")
 default.bin.cands <- all.bin.cands[1:3]
 default.cont.cands <- all.cont.cands[1:3]
 
@@ -46,9 +46,9 @@ default.cont.cands <- all.cont.cands[1:3]
 ################################################################################
 
 multiPIM <- function(Y, A, W = NULL, ## data frames
-                     estimator = c("DR-IPCW", "IPCW"),
-                     g.method = "sl", g.sl.cands = default.bin.cands,
-                     g.num.folds = 5, g.num.splits = 1,
+                     estimator = c("TMLE", "DR-IPCW", "IPCW", "G-COMP"),
+                     g.method = "main.terms.logistic", g.sl.cands = NULL,
+                     g.num.folds = NULL, g.num.splits = NULL,
                      Q.method = "sl", Q.sl.cands = "default", ## ignored if
                                                        ## estimator is "IPCW"
                      Q.num.folds = 5, Q.num.splits = 1, ## ignored if
@@ -67,6 +67,7 @@ multiPIM <- function(Y, A, W = NULL, ## data frames
                                          ## the bootstrap
                      verbose = FALSE,
                      extra.cands = NULL,
+                     standardize = TRUE, ## applies to lars and penalized cands
                      ...) {
 
 ################################ check input ###################################
@@ -87,16 +88,20 @@ multiPIM <- function(Y, A, W = NULL, ## data frames
 
   estimator = match.arg(estimator)
 
-  if(estimator == "DR-IPCW") {
-    double.robust <- TRUE
-  } else double.robust <- FALSE
+  if(estimator == "IPCW") {
+    do.Q <- FALSE
+  } else do.Q <- TRUE
 
+  if(estimator == "G-COMP") {
+    do.g <- FALSE
+  } else do.g <- TRUE
+     
   ## names of the built-in candidates
 
   all.bin.cands <- c("polyclass", "penalized.bin", "main.terms.logistic",
-                     "randomForest.bin", "rpart.bin")
-  all.cont.cands <- c("polymars", "lars", "main.terms.linear",
-                      "randomForest.cont", "rpart.cont", "penalized.cont")
+                     "rpart.bin")
+  all.cont.cands <- c("polymars", "lars", "main.terms.linear", "penalized.cont",
+                      "rpart.cont") 
   default.bin.cands <- all.bin.cands[1:3]
   default.cont.cands <- all.cont.cands[1:3]
 
@@ -104,7 +109,7 @@ multiPIM <- function(Y, A, W = NULL, ## data frames
 
     ## make sure either Q.type was specified or estimator is "IPCW"
 
-    if(!Q.type.override && double.robust)
+    if(!Q.type.override && do.Q)
       stop('If check.input is FALSE and estimator is not "IPCW"\n',
            'then Q.type must be specified as either of\n',
            '"continuous.outcome" or "binary.outcome"')
@@ -171,8 +176,8 @@ multiPIM <- function(Y, A, W = NULL, ## data frames
              "the elements of all.bin.cands and all.cont.cands")
     }
 
-    ## go back and check on Q.type (but only if double.robust is TRUE)
-    if(double.robust) {
+    ## go back and check on Q.type (but only if do.Q is TRUE)
+    if(do.Q) {
 
       if(!Q.type.override) {
 
@@ -211,8 +216,7 @@ multiPIM <- function(Y, A, W = NULL, ## data frames
       ## first check that length is 1
 
       if(length(Q.method) != 1)
-        stop("you have chosen a double robust estimator,\n",
-             "so Q.method must be a length 1 character vector giving\n",
+        stop("Q.method must be a length 1 character vector giving\n",
              "a regression method to use for modeling Q")
 
       if(Q.method != "sl") {
@@ -302,7 +306,7 @@ multiPIM <- function(Y, A, W = NULL, ## data frames
 
       } ## end else for which Q.method should be "sl"
       
-    } ## end if double.robust
+    } ## end if do.Q
 
     ## now check A ##
 
@@ -359,46 +363,48 @@ multiPIM <- function(Y, A, W = NULL, ## data frames
              'a single logical value, either TRUE or FALSE')
     }
 
-    ## check g.method
+    ## check stuff for g modeling if do.g
 
-    if(length(g.method) != 1 ||
-       !(g.method %in% c(all.bin.cands, "sl", names(extra.cands))))
-      stop("g.method must be specified as a length one character vector.\n",
-           'Its value must be either "sl" (for super learner), ',
-           'or an element of\n',
-           'the all.bin.cands character vector, or, if extra.cands has been\n',
-           'specified, it may be the name of one of the functions in the\n',
-           'extra.cands list of functions.')
+    if(do.g) {
 
-    ## check g.sl.cands, g.num.folds and g.num.splits if g.method is "sl"
+      ## check g.method
 
-    if(g.method == "sl") {
+      if(length(g.method) != 1 ||
+         !(g.method %in% c(all.bin.cands, "sl", names(extra.cands))))
+        stop('If estimator is not "G-comp", then g.method must be \n',
+             'a length 1 character vector which is either\n',
+             'the name of a binary outcome candidate,\n',
+             'or "sl" for super learning')
+      
+      ## check g.sl.cands, g.num.folds and g.num.splits if g.method is "sl"
 
-      if(!all(g.sl.cands %in% c(all.bin.cands, names(extra.cands))))
-        stop('if g.method is "sl" then g.sl.cands must be a character vector,',
-             '\neach element of which must either be an element of the vector',
-             '\nall.bin.cands, or, if extra.cands has been specified, the name',
-             ' of\none of the functions in the extra.cands list of functions.')
+      if(g.method == "sl") {
 
-      if(!identical(unique(g.sl.cands), g.sl.cands) ||
-         length(g.sl.cands) < 2)
-        stop('if g.method is "sl", then g.sl.cands must contain at least\n',
-             "2 different valid candidate names,\nand no repetitions are ",
-             "allowed")
+        if(!all(g.sl.cands %in% c(all.bin.cands, names(extra.cands))))
+          stop('if g.method is "sl" then g.sl.cands must be specified.\n',
+               'See help file for possible values')
 
-      if( !identical(mode(g.num.folds), "numeric") || length(g.num.folds) != 1
-         || is.na(g.num.folds) || g.num.folds < 2 || g.num.folds > nrow(Y)
-         || (g.num.folds %% 1) != 0 )
-        stop('if g.method is "sl", then g.num.folds must be a length 1\n',
-             "numeric vector with an integer value greater than or equal to 2",
-             "\nand less than or equal to nrow(Y)")
+        if(!identical(unique(g.sl.cands), g.sl.cands) ||
+           length(g.sl.cands) < 2)
+          stop('if g.method is "sl", then g.sl.cands must contain at least\n',
+               "2 different valid candidate names,\nand no repetitions are ",
+               "allowed")
 
-      if(!identical(mode(g.num.splits), "numeric") || length(g.num.splits) != 1
-         || is.na(g.num.splits) || g.num.splits < 1
-         || (g.num.splits %% 1) != 0 )
-        stop("g.num.splits must be a single integer value that is >= 1")
-    }
+        if( !identical(mode(g.num.folds), "numeric") || length(g.num.folds) != 1
+           || is.na(g.num.folds) || g.num.folds < 2 || g.num.folds > nrow(Y)
+           || (g.num.folds %% 1) != 0 )
+          stop('if g.method is "sl", then g.num.folds must be\n',
+               "an integer value greater than or equal to 2\n",
+               "and less than or equal to nrow(Y)")
 
+        if(!identical(mode(g.num.splits), "numeric")
+           || length(g.num.splits) != 1
+           || is.na(g.num.splits) || g.num.splits < 1
+           || (g.num.splits %% 1) != 0 )
+          stop("g.num.splits must be a single integer value that is >= 1")
+      }
+    } ## end if do.g
+    
     ## check W ##
 
     if(!is.null(W)) {
@@ -423,17 +429,18 @@ multiPIM <- function(Y, A, W = NULL, ## data frames
 
       if(any(is.na(W))) stop("W has missing values. This is not yet supported.")
 
-      ## check class/mode of the columns of W make sure class is not factor
-      ## and mode is numeric
+      ## check class/mode of the columns of W -- may be numeric or factor
 
       for(j in 1:ncol(W)) {
 
-        if(identical(class(W[[j]]), "factor"))
-          stop("One or more columns of W is a factor. This is not yet allowed")
-
         if(!identical(mode(W[[j]]), "numeric"))
-          stop('If a W is supplied, each of its columns must have mode ',
-               '"numeric"')
+          stop('The columns of W must have mode "numeric"\n',
+               '(class may be "numeric", "integer" or "factor")')
+
+        if(!(identical(class(W[[j]]), "numeric")
+             || identical(class(W[[j]]), "integer")
+             || ("factor" %in% class(W[[j]])))) ## allow ordered factors
+          stop('Columns of W must have class "numeric", "integer" or "factor"')
 
       }
 
@@ -456,14 +463,16 @@ multiPIM <- function(Y, A, W = NULL, ## data frames
              "then you must supply a data frame W with at least one column.")
     }
 
-    ## check truncate
+    ## check truncate (but ignore if !do.g)
 
-    if(!identical(truncate, FALSE)) {
+    if(do.g) {
+      if(!identical(truncate, FALSE)) {
 
-      if(length(truncate) != 1 || mode(truncate) != "numeric" || truncate <= 0
-         || truncate > 0.5)
-        stop("the truncate argument must be either the logical value FALSE,\n",
-             "or a single number which is greater than 0 and less than 0.5")
+        if(length(truncate) != 1 || mode(truncate) != "numeric" || truncate <= 0
+           || truncate > 0.5)
+          stop("the truncate argument must be either FALSE or",
+               "a number greater than 0 and less than 0.5")
+      }
     }
 
     ## check return.final.models
@@ -472,6 +481,12 @@ multiPIM <- function(Y, A, W = NULL, ## data frames
          || identical(return.final.models, FALSE)))
       stop("return.final.models must be either TRUE or FALSE")
 
+    ## check standardize
+    
+    if(!(identical(standardize, TRUE)
+         || identical(standardize, FALSE)))
+      stop("the standardize argument must be either TRUE or FALSE")
+        
   } ## end else check rest of input
 
 ################################################################################
@@ -521,7 +536,7 @@ multiPIM <- function(Y, A, W = NULL, ## data frames
 
 ## convert Q.sl.cands == "all" or "default" to actual candidates if applicable
 
-  if(double.robust && Q.method == "sl") {
+  if(do.Q && Q.method == "sl") {
 
     if(identical(Q.sl.cands, "all")) {
 
@@ -537,6 +552,27 @@ multiPIM <- function(Y, A, W = NULL, ## data frames
     }
   }
 
+####################### function to expand factors #############################
+
+  ## input is a data frame, output will be a matrix
+
+  expand.factors <- function(X) {
+
+    nobs <- nrow(X)
+    
+    ## make a dummy y
+
+    y <- numeric(nobs)
+
+    data1 <- cbind(y = y, X)
+
+    f1 <- formula(data1)
+
+    ## factors will be expanded according to getOption("contrasts")
+    
+    mm1 <- model.matrix(f1, data = data1)[, -1, drop = FALSE]
+    
+ } 
 ############### Generate list of functions for the candidates ##################
 
   if(!is.null(extra.cands)) {
@@ -549,20 +585,26 @@ multiPIM <- function(Y, A, W = NULL, ## data frames
 
   if(g.method == "polyclass"
      || (g.method == "sl" && "polyclass" %in% g.sl.cands)
-     || (double.robust && identical(Q.type, "binary.outcome")
+     || (do.Q && identical(Q.type, "binary.outcome")
          && (Q.method == "polyclass"
              || (Q.method == "sl" && "polyclass" %in% Q.sl.cands)))) {
 
-    candidate.functions$polyclass <- function(X, Y, newX, force) {
+    candidate.functions$polyclass <- function(X, Y, newX, force, standardize) {
 
-      result <- vector("list", length = 3)
-      names(result) <- c("preds", "main.model", "force.model")
+      result <- vector("list", length = 4)
+      names(result) <- c("preds", "fitted", "main.model", "force.model")
       class(result) <- "polyclass.result"
-      
-      result$main.model <- polyclass(as.vector(Y), X)
+
+      expanded.X <- expand.factors(X)
+      expanded.newX <- expand.factors(newX)
+
+      result$main.model <- polyclass(as.vector(Y), expanded.X)
 
       if(missing(force) || force %in% result$main.model$fcts[, 1]) {
-        result$preds <- ppolyclass(cov = newX, fit = result$main.model)[,2]
+        result$fitted <- ppolyclass(cov = expanded.X,
+                                   fit = result$main.model)[,2]
+        result$preds <- ppolyclass(cov = expanded.newX,
+                                   fit = result$main.model)[,2]
         return(result)
       }
       
@@ -574,6 +616,7 @@ multiPIM <- function(Y, A, W = NULL, ## data frames
         result$force.model <- glm(glm.formula, data = glm.data,
                                   family = binomial, model = FALSE,
                                   y = FALSE)
+        result$fitted <- predict(result$force.model, type = "response")
         result$preds <- predict(result$force.model, type = "response",
                                 newdata = newX[, force, drop = FALSE])
         return(result)
@@ -581,7 +624,7 @@ multiPIM <- function(Y, A, W = NULL, ## data frames
 
       ## Truncate so that you don't get Inf's that crash glm
 
-      pred.probs <- ppolyclass(cov = X, fit = result$main.model)[,2]
+      pred.probs <- ppolyclass(cov = expanded.X, fit = result$main.model)[,2]
       pred.probs[pred.probs < 0.001] <- 0.001
       pred.probs[pred.probs > 0.999] <- 0.999
 
@@ -592,12 +635,14 @@ multiPIM <- function(Y, A, W = NULL, ## data frames
       result$force.model <- glm(glm.formula, data = glm.data, family = binomial,
                                 model = FALSE, y = FALSE)
 
+      result$fitted <- predict(result$force.model, type = "response")
+
       ## Don't truncate the predictions on newX
       ## (predict.glm can handle Inf's without crashing)
 
       result$preds <- predict(result$force.model, type = "response",
                               newdata = cbind(newX[, force, drop = FALSE],
-                                preds = qlogis(ppolyclass(cov = newX,
+                                preds = qlogis(ppolyclass(cov = expanded.newX,
                                                fit = result$main.model)[,2])))
       return(result)
     }
@@ -605,113 +650,133 @@ multiPIM <- function(Y, A, W = NULL, ## data frames
 
   if(g.method == "penalized.bin"
      || (g.method == "sl" && "penalized.bin" %in% g.sl.cands)
-     || (double.robust && identical(Q.type, "binary.outcome")
+     || (do.Q && identical(Q.type, "binary.outcome")
          && (Q.method == "penalized.bin"
              || (Q.method == "sl" && "penalized.bin" %in% Q.sl.cands)))) {
 
-    candidate.functions$penalized.bin <- function(X, Y, newX, force) {
+    candidate.functions$penalized.bin <- function(X, Y, newX, force,
+                                                  standardize) {
 
-      result <- vector("list", length = 3)
-      names(result) <- c("preds", "main.model", "force.model")
+      result <- vector("list", length = 4)
+      names(result) <- c("preds", "fitted", "main.model", "force.model")
       class(result) <- "penalized.bin.result"
+
+      expanded.X <- data.frame(expand.factors(X))
+      expanded.newX <- data.frame(expand.factors(newX))
 
       if(missing(force)) {
 
-        lambdas.and.cvls <- profL1(Y[, 1], as.matrix(X), steps = 10,
-                                   lambda2 = 0,
-                                   model = "logistic", fold = 5, trace = FALSE,
-                                   standardize = FALSE)[c("lambda", "cvl")]
+        pen.formula <- as.formula(paste("~", paste(names(expanded.X),
+                                                   collapse = "+"),
+                                        sep = ""))
+      
+        lambdas.and.cvls <- profL1(Y[, 1], pen.formula, data = expanded.X,
+                                   lambda2 = 0, model = "logistic", fold = 5,
+                                   standardize = standardize, steps = 10,
+                                   trace = FALSE)[c("lambda", "cvl")]
         lambda1.to.use <-
           lambdas.and.cvls$lambda[which.max(lambdas.and.cvls$cvl)]
 
-        result$main.model <- penalized(Y[, 1], as.matrix(X), trace = FALSE,
+        result$main.model <- penalized(Y[, 1], pen.formula,
+                                       data = expanded.X, trace = FALSE,
                                        lambda1 = lambda1.to.use,
-                                       standardize = FALSE,
+                                        standardize = standardize,
                                        model = "logistic")
-        result$preds <- predict(result$main.model, penalized = newX)
+        result$preds <- predict(result$main.model, penalized = pen.formula,
+                                data = expanded.newX)
+        result$fitted <- predict(result$main.model, penalized = pen.formula,
+                                 data = expanded.X)
+        
         
         return(result)
       }
 
-      pen.formula <- as.formula(paste("~", paste(names(X)[-force],
+      pen.formula <- as.formula(paste("~", paste(names(expanded.X)[-force],
                                                  collapse = "+"),
                                       sep = ""))
-      unpen.formula <- as.formula(paste("~", names(X)[force], sep = ""))
+      unpen.formula <- as.formula(paste("~", names(expanded.X)[force],
+                                        sep = ""))
 
-      lambdas.and.cvls <- profL1(Y[, 1], pen.formula, unpen.formula, data = X,
+      lambdas.and.cvls <- profL1(Y[, 1], pen.formula, unpen.formula,
+                                 data = expanded.X,
                                  steps = 10, lambda2 = 0, model = "logistic",
                                  trace = FALSE, fold = 5,
-                                 standardize = FALSE)[c("lambda", "cvl")]
+                                 standardize = standardize)[c("lambda", "cvl")]
       lambda1.to.use <- lambdas.and.cvls$lambda[which.max(lambdas.and.cvls$cvl)]
 
       result$main.model <- penalized(Y[, 1], pen.formula, unpen.formula,
-                                     data = X, standardize = FALSE,
+                                     data = expanded.X,
+                                     standardize = standardize,
                                      lambda1 = lambda1.to.use,
                                      model = "logistic", trace = FALSE)
       result$preds <- predict(result$main.model,
                               penalized = pen.formula,
                               unpenalized = unpen.formula,
-                              data = newX)
+                              data = expanded.newX)
+      result$fitted <- predict(result$main.model,
+                              penalized = pen.formula,
+                              unpenalized = unpen.formula,
+                              data = expanded.X)
       return(result)
     }
   }
 
-  if(g.method == "randomForest.bin"
-     || (g.method == "sl" && "randomForest.bin" %in% g.sl.cands)
-     || (double.robust && identical(Q.type, "binary.outcome")
-         && (Q.method == "randomForest.bin"
-             || (Q.method == "sl" && "randomForest.bin" %in% Q.sl.cands)))) {
+  ## if(g.method == "randomForest.bin"
+  ##    || (g.method == "sl" && "randomForest.bin" %in% g.sl.cands)
+  ##    || (do.Q && identical(Q.type, "binary.outcome")
+  ##        && (Q.method == "randomForest.bin"
+  ##            || (Q.method == "sl" && "randomForest.bin" %in% Q.sl.cands)))) {
 
-    candidate.functions$randomForest.bin <- function(X, Y, newX, force) {
+  ##   candidate.functions$randomForest.bin <- function(X, Y, newX, force,
+  ##                                                    standardize) {
 
-      result <- vector("list", length = 3)
-      names(result) <- c("preds", "main.model", "force.model")
-      class(result) <- "randomForest.bin.result"
+  ##     result <- vector("list", length = 3)
+  ##     names(result) <- c("preds", "main.model", "force.model")
+  ##     class(result) <- "randomForest.bin.result"
       
-      result$main.model <- randomForest(X, factor(Y[, 1]))
+  ##     result$main.model <- randomForest(X, factor(Y[, 1]))
 
-      if(missing(force)) {
+  ##     if(missing(force)) {
         
-        result$preds <- predict(result$main.model, newX, type = "prob")[, "1"]
-        return(result)
-      }
+  ##       result$preds <- predict(result$main.model, newX, type = "prob")[, "1"]
+  ##       return(result)
+  ##     }
 
-      ## Truncate so that you don't get Inf's that crash glm
+  ##     ## Truncate so that you don't get Inf's that crash glm
 
-      pred.probs <- predict(result$main.model, type = "prob")[, "1"]
-      pred.probs[pred.probs < 0.001] <- 0.001
-      pred.probs[pred.probs > 0.999] <- 0.999
+  ##     pred.probs <- predict(result$main.model, type = "prob")[, "1"]
+  ##     pred.probs[pred.probs < 0.001] <- 0.001
+  ##     pred.probs[pred.probs > 0.999] <- 0.999
 
-      glm.data <- cbind(Y, X[, force, drop = FALSE],
-                        preds = qlogis(pred.probs))
+  ##     glm.data <- cbind(Y, X[, force, drop = FALSE],
+  ##                       preds = qlogis(pred.probs))
 
-      glm.formula <- paste(names(Y), "~", names(X)[force], "*preds", sep = "")
-      result$force.model <- glm(glm.formula, data = glm.data, family = binomial,
-                                model = FALSE, y = FALSE)
+  ##     glm.formula <- paste(names(Y), "~", names(X)[force], "*preds", sep = "")
+  ##     result$force.model <- glm(glm.formula, data = glm.data, family = binomial,
+  ##                               model = FALSE, y = FALSE)
 
-      ## Don't truncate the predictions on newX
-      ## (predict.glm can handle Inf's without crashing)
+  ##     ## Don't truncate the predictions on newX
+  ##     ## (predict.glm can handle Inf's without crashing)
 
-      result$preds <- predict(result$force.model, type = "response",
-                              newdata = cbind(newX[, force, drop = FALSE],
-                                preds = qlogis(predict(result$main.model, newX,
-                                  type = "prob")[, "1"])))
-      return(result)
-    }
-  }
+  ##     result$preds <- predict(result$force.model, type = "response",
+  ##                             newdata = cbind(newX[, force, drop = FALSE],
+  ##                               preds = qlogis(predict(result$main.model, newX,
+  ##                                 type = "prob")[, "1"])))
+  ##     return(result)
+  ##   }
+  ## }
 
   if(g.method == "main.terms.logistic"
      || (g.method == "sl" && "main.terms.logistic" %in% g.sl.cands)
-     || (double.robust && identical(Q.type, "binary.outcome")
+     || (do.Q && identical(Q.type, "binary.outcome")
          && (Q.method == "main.terms.logistic"
              || (Q.method == "sl" && "main.terms.logistic" %in% Q.sl.cands)))) {
 
-    candidate.functions$main.terms.logistic <- function(X, Y, newX, force) {
+    candidate.functions$main.terms.logistic <- function(X, Y, newX, force,
+                                                        standardize) {
 
-      result <- vector("list", length = 3)
-
-      names(result) <- c("preds", "main.model", "force.model")
-
+      result <- vector("list", length = 4)
+      names(result) <- c("preds", "fitted", "main.model", "force.model")
       class(result) <- "main.terms.logistic.result"
 
       formula.string <- paste(names(Y), "~", paste(names(X), collapse = "+"),
@@ -722,21 +787,21 @@ multiPIM <- function(Y, A, W = NULL, ## data frames
 
       result$preds <- predict(result$main.model, newdata = newX,
                               type = "response")
-
+      result$fitted <- predict(result$main.model, type = "response")
       return(result)
     }
   }
 
   if(g.method == "rpart.bin"
      || (g.method == "sl" && "rpart.bin" %in% g.sl.cands)
-     || (double.robust && identical(Q.type, "binary.outcome")
+     || (do.Q && identical(Q.type, "binary.outcome")
          && (Q.method == "rpart.bin"
              || (Q.method == "sl" && "rpart.bin" %in% Q.sl.cands)))) {
 
-    candidate.functions$rpart.bin <- function(X, Y, newX, force) {
+    candidate.functions$rpart.bin <- function(X, Y, newX, force, standardize) {
 
-      result <- vector("list", length = 3)
-      names(result) <- c("preds", "main.model", "force.model")
+      result <- vector("list", length = 4)
+      names(result) <- c("preds", "fitted", "main.model", "force.model")
       class(result) <- "rpart.result"
 
       formula.string <- paste(names(Y), "~", paste(names(X), collapse = "+"),
@@ -748,6 +813,7 @@ multiPIM <- function(Y, A, W = NULL, ## data frames
 
         result$preds <- predict(result$main.model, newdata = newX,
                                 type = "prob")[, 2]
+        result$fitted <- predict(result$main.model, type = "prob")[, 2]
         return(result)
       }
       
@@ -761,6 +827,7 @@ multiPIM <- function(Y, A, W = NULL, ## data frames
 
         result$preds <- predict(result$force.model, type = "response",
                                 newdata = newX[, force, drop = FALSE])
+        result$fitted <- predict(result$force.model, type = "response")
         return(result)
       }
 
@@ -781,28 +848,35 @@ multiPIM <- function(Y, A, W = NULL, ## data frames
                               newdata = cbind(newX[, force, drop = FALSE],
                                 preds = qlogis(predict(result$main.model,
                                   newdata = newX, type = "prob")[, 2])))
+      result$fitted <- predict(result$force.model, type = "response")
       return(result)
     }
   }
 
   ## Add continuous outcome candidate functions
 
-  if(double.robust && identical(Q.type, "continuous.outcome")) {
+  if(do.Q && identical(Q.type, "continuous.outcome")) {
 
     if(Q.method == "polymars"
        || (Q.method == "sl" && "polymars" %in% Q.sl.cands)) {
 
-      candidate.functions$polymars <- function(X, Y, newX, force) {
+      candidate.functions$polymars <- function(X, Y, newX, force, standardize) {
 
-        result <- vector("list", length = 3)
-        names(result) <- c("preds", "main.model", "force.model")
+        result <- vector("list", length = 4)
+        names(result) <- c("preds", "fitted", "main.model", "force.model")
         class(result) <- "polymars.result"
 
+        expanded.X <- expand.factors(X)
+        expanded.newX <- expand.factors(newX)
+        
         startmodel <- c(force, NA, NA, NA, 1)
         dim(startmodel) <- c(1, 5)
 
-        result$main.model <- polymars(Y[, 1], X, startmodel = startmodel)
-        result$preds <- predict(result$main.model, x = newX)
+        result$main.model <- polymars(Y[, 1], expanded.X,
+                                      startmodel = startmodel)
+        result$preds <- predict(result$main.model, x = expanded.newX)
+        result$fitted <- predict(result$main.model, x = expanded.X)
+        
         return(result)
       }
     }
@@ -810,31 +884,38 @@ multiPIM <- function(Y, A, W = NULL, ## data frames
     if(Q.method == "lars"
        || (Q.method == "sl" && "lars" %in% Q.sl.cands)) {
 
-      candidate.functions$lars <- function(X, Y, newX, force) {
+      candidate.functions$lars <- function(X, Y, newX, force, standardize) {
 
-        result <- vector("list", length = 3)
-        names(result) <- c("preds", "main.model", "force.model")
+        result <- vector("list", length = 4)
+        names(result) <- c("preds", "fitted", "main.model", "force.model")
         class(result) <- "lars.result"
 
         cv.grid <- 0:50/50
 
-        cv.output <- cv.lars(as.matrix(X), Y[, 1], type = "lar",
-                             normalize = FALSE, mode = "fraction",
+        expanded.X <- expand.factors(X)
+        expanded.newX <- expand.factors(newX)
+        
+        cv.output <- cv.lars(expanded.X, Y[, 1], type = "lar",
+                             normalize = standardize, mode = "fraction",
                              index = cv.grid, plot.it = FALSE)$cv
 
         fraction.to.use <- cv.grid[which.min(cv.output)]
 
-        result$main.model <- lars(as.matrix(X), Y[, 1], type = "lar",
-                                  normalize = FALSE)
+        result$main.model <- lars(expanded.X, Y[, 1], type = "lar",
+                                  normalize = standardize)
 
         coefs <- coef(result$main.model, mode = "fraction", s = fraction.to.use)
 
-        new.preds <- predict(result$main.model, as.matrix(newX),
+        new.preds <- predict(result$main.model, expanded.newX,
                              mode = "fraction",
                              s = fraction.to.use, type = "fit")$fit
-
+        lars.fitted <- predict(result$main.model, expanded.X,
+                                   mode = "fraction", s = fraction.to.use,
+                                   type = "fit")$fit
+        
         if(coefs[force] != 0) {
 
+          result$fitted <- lars.fitted
           result$preds <- new.preds
           return(result)
         }
@@ -843,67 +924,71 @@ multiPIM <- function(Y, A, W = NULL, ## data frames
 
           lm.data <- cbind(Y, X[, force, drop = FALSE])
           lm.formula <- paste(names(Y), "~", names(X)[force], sep = "")
+          result$force.model <- lm(lm.formula, data = lm.data)
 
-          result$force.model <- lm(lm.formula, data = lm.data,
-                                   model = FALSE, y = FALSE)
-
+          result$fitted <- predict(result$force.model, type = "response")
           result$preds <- predict(result$force.model, type = "response",
                                   newdata = newX[, force, drop = FALSE])
+
           return(result)
         }
 
         lm.data <- cbind(Y, X[, force, drop = FALSE],
-                         preds = predict(result$main.model, as.matrix(X),
-                                         mode = "fraction",
-                                         s = fraction.to.use, type = "fit")$fit)
+                         preds = lars.fitted)
         lm.formula <- paste(names(Y), "~", names(X)[force], "*preds", sep = "")
-        result$force.model <- lm(lm.formula, data = lm.data,
-                                 model = FALSE, y = FALSE)
+        result$force.model <- lm(lm.formula, data = lm.data)
+
+        result$fitted <- predict(result$force.model, type = "response")
         result$preds <- predict(result$force.model, type = "response",
                                 newdata = cbind(newX[, force, drop = FALSE],
                                                 preds = new.preds))
+
         return(result)
       }
     }
 
-    if(Q.method == "randomForest.cont"
-       || (Q.method == "sl" && "randomForest.cont" %in% Q.sl.cands)) {
+    ## if(Q.method == "randomForest.cont"
+    ##    || (Q.method == "sl" && "randomForest.cont" %in% Q.sl.cands)) {
 
-      candidate.functions$randomForest.cont <- function(X, Y, newX, force) {
+    ##   candidate.functions$randomForest.cont <- function(X, Y, newX, force,
+    ##                                                     standardize) {
 
-        result <- vector("list", length = 3)
-        names(result) <- c("preds", "main.model", "force.model")
-        class(result) <- "randomForest.cont.result"
+    ##     result <- vector("list", length = 3)
+    ##     names(result) <- c("preds", "main.model", "force.model")
+    ##     class(result) <- "randomForest.cont.result"
 
-        result$main.model <- randomForest(X, Y[, 1])
+    ##     result$main.model <- randomForest(X, Y[, 1])
 
-        lm.data <- cbind(Y, X[, force, drop = FALSE],
-                         preds = predict(result$main.model))
-        lm.formula <- paste(names(Y), "~", names(X)[force], "*preds", sep = "")
-        result$force.model <- lm(lm.formula, data = lm.data,
-                                 model = FALSE, y = FALSE)
-        result$preds <- predict(result$force.model, type = "response",
-                                newdata = cbind(newX[, force, drop = FALSE],
-                                  preds = predict(result$main.model, newX)))
-        return(result)
-      }
-    }
+    ##     lm.data <- cbind(Y, X[, force, drop = FALSE],
+    ##                      preds = predict(result$main.model))
+    ##     lm.formula <- paste(names(Y), "~", names(X)[force], "*preds", sep = "")
+    ##     result$force.model <- lm(lm.formula, data = lm.data,
+    ##                              model = FALSE, y = FALSE)
+    ##     result$preds <- predict(result$force.model, type = "response",
+    ##                             newdata = cbind(newX[, force, drop = FALSE],
+    ##                               preds = predict(result$main.model, newX)))
+    ##     return(result)
+    ##   }
+    ## }
 
     if(Q.method == "main.terms.linear"
        || (Q.method == "sl" && "main.terms.linear" %in% Q.sl.cands)) {
 
-      candidate.functions$main.terms.linear <- function(X, Y, newX, force) {
+      candidate.functions$main.terms.linear <- function(X, Y, newX, force,
+                                                        standardize) {
 
-        result <- vector("list", length = 3)
-        names(result) <- c("preds", "main.model", "force.model")
+        result <- vector("list", length = 4)
+        names(result) <- c("preds", "fitted", "main.model", "force.model")
         class(result) <- "main.terms.linear.result"
 
         formula.string <- paste(names(Y), "~", paste(names(X), collapse = "+"),
                                 sep = "")
         result$main.model <- lm(formula.string, data = cbind(Y, X),
-                                model = FALSE, y = FALSE)
+                                model = TRUE, y = FALSE)
         result$preds <- predict(result$main.model, newdata = newX,
                                 type = "response")
+        result$fitted <- predict(result$main.model, type = "response")
+
         return(result)
       }
     }
@@ -911,30 +996,42 @@ multiPIM <- function(Y, A, W = NULL, ## data frames
     if(Q.method == "penalized.cont"
        || (Q.method == "sl" && "penalized.cont" %in% Q.sl.cands)) {
 
-      candidate.functions$penalized.cont <- function(X, Y, newX, force) {
+      candidate.functions$penalized.cont <- function(X, Y, newX, force,
+                                                     standardize) {
 
-        result <- vector("list", length = 3)
-        names(result) <- c("preds", "main.model", "force.model")
+        result <- vector("list", length = 4)
+        names(result) <- c("preds", "fitted", "main.model", "force.model")
         class(result) <- "penalized.cont.result"
 
-        pen.formula <- as.formula(paste("~", paste(names(X)[-force],
+        expanded.X <- data.frame(expand.factors(X))
+        expanded.newX <- data.frame(expand.factors(newX))
+
+        pen.formula <- as.formula(paste("~", paste(names(expanded.X)[-force],
                                                    collapse = "+"),
                                         sep = ""))
-        unpen.formula <- as.formula(paste("~", names(X)[force], sep = ""))
+        unpen.formula <- as.formula(paste("~", names(expanded.X)[force],
+                                          sep = ""))
 
-        lambdas.and.cvls <- profL1(Y[, 1], pen.formula, unpen.formula, data = X,
+        lambdas.and.cvls <- profL1(Y[, 1], pen.formula, unpen.formula,
+                                   data = expanded.X,
                                    steps = 10, lambda2 = 0, model = "linear",
                                    trace = FALSE, fold = 5,
-                                   standardize = FALSE)[c("lambda", "cvl")]
+                                   standardize = standardize)[c("lambda",
+                                                                "cvl")]
         lambda1.to.use <-
           lambdas.and.cvls$lambda[which.max(lambdas.and.cvls$cvl)]
 
         result$main.model <- penalized(Y[, 1], pen.formula, unpen.formula,
-                                       data = X, lambda1 = lambda1.to.use,
-                                       standardize = FALSE,
+                                       data = expanded.X,
+                                       lambda1 = lambda1.to.use,
+                                       standardize = standardize,
                                        model = "linear", trace = FALSE)
         result$preds <- predict(result$main.model, penalized = pen.formula,
-                                unpenalized = unpen.formula, data = newX)[, 1]
+                                unpenalized = unpen.formula,
+                                data = expanded.newX)[, 1]
+        result$fitted <- predict(result$main.model, penalized = pen.formula,
+                                unpenalized = unpen.formula,
+                                data = expanded.X)[, 1]
         return(result)
       }
     }
@@ -942,10 +1039,11 @@ multiPIM <- function(Y, A, W = NULL, ## data frames
     if(Q.method == "rpart.cont"
        || (Q.method == "sl" && "rpart.cont" %in% Q.sl.cands)) {
 
-      candidate.functions$rpart.cont <- function(X, Y, newX, force) {
+      candidate.functions$rpart.cont <- function(X, Y, newX, force,
+                                                 standardize) {
 
-        result <- vector("list", length = 3)
-        names(result) <- c("preds", "main.model", "force.model")
+        result <- vector("list", length = 4)
+        names(result) <- c("preds", "fitted", "main.model", "force.model")
         class(result) <- "rpart.cont.result"
 
         formula.string <- paste(names(Y), "~", paste(names(X), collapse = "+"),
@@ -956,6 +1054,7 @@ multiPIM <- function(Y, A, W = NULL, ## data frames
         if(result$main.model$frame$var[1] == names(X)[force]) {
           result$preds <- predict(result$main.model, newdata = newX,
                                   type = "vector")
+          result$fitted <- predict(result$main.model, type = "vector")
           return(result)
         }
         
@@ -963,24 +1062,24 @@ multiPIM <- function(Y, A, W = NULL, ## data frames
 
           lm.data <- cbind(Y, X[, force, drop = FALSE])
           lm.formula <- paste(names(Y), "~", names(X)[force], sep = "")
-          result$force.model <- lm(lm.formula, data = lm.data,
-                                   model = FALSE, y = FALSE)
+          result$force.model <- lm(lm.formula, data = lm.data)
           result$preds <- predict(result$force.model, type = "response",
                                   newdata = newX[, force, drop = FALSE])
+          result$fitted <- predict(result$force.model, type = "response")
           return(result)
         }
 
         lm.data <- cbind(Y, X[, force, drop = FALSE],
                          preds = predict(result$main.model, type = "vector"))
         lm.formula <- paste(names(Y), "~", names(X)[force], "*preds", sep = "")
-        result$force.model <- lm(lm.formula, data = lm.data,
-                                 model = FALSE, y = FALSE)
+        result$force.model <- lm(lm.formula, data = lm.data)
         result$preds <-
           predict(result$force.model, type = "response",
                   newdata = cbind(newX[, force, drop = FALSE],
                                   preds = predict(result$main.model,
                                                   newdata = newX,
                                                   type = "vector")))
+        result$fitted <- predict(result$force.model, type = "response")
         return(result)
       }
     }
@@ -995,20 +1094,26 @@ multiPIM <- function(Y, A, W = NULL, ## data frames
 
   ## make a copy of that to store plug-in standard errors
 
-  stand.errs <- param.estimates
-
-  ## objects for returning the final g and Q models
+  if(estimator != "G-COMP") {
+    stand.errs <- param.estimates
+  } else stand.errs <- NA
+  
+  ## lists for returning the final g and Q models
+  ## and arrays to store cross-validated risks for returning to user
 
   g.final.models <- NULL
   Q.final.models <- NULL
-  
+  g.cv.risk.array <- NA
+  Q.cv.risk.array <- NA
+
   if(return.final.models) {
   
     ## create list to store final g models
-  
-    g.final.models <- vector("list", length = ncol(A))
 
-    if(double.robust) {
+    if(do.g)
+      g.final.models <- vector("list", length = ncol(A))
+
+    if(do.Q) {
 
       ## create list of lists to store final Q models
   
@@ -1018,14 +1123,9 @@ multiPIM <- function(Y, A, W = NULL, ## data frames
     }
   }
 
-  ## arrays to store cross-validated risks for returning to user
-
-  g.cv.risk.array <- NULL
-  Q.cv.risk.array <- NULL
-  
   ## prepare for modeling the g's
 
-  if(g.method == "sl") {
+  if(do.g && g.method == "sl") {
 
     ## generate matrix to store x-validation predictions
 
@@ -1049,7 +1149,7 @@ multiPIM <- function(Y, A, W = NULL, ## data frames
 
   ## prepare for modeling the Q's
 
-  if(double.robust && Q.method == "sl") {
+  if(do.Q && Q.method == "sl") {
 
     ## generate matrix to store x-validation predictions
 
@@ -1078,137 +1178,142 @@ multiPIM <- function(Y, A, W = NULL, ## data frames
     if(verbose) cat("starting on exposure number", i, "of", ncol(A),
                     "in main loop over the exposures\n")
 
-    if(g.method == "sl") {
+    if(do.g) {
 
-      for(split.num in 1:g.num.splits) {
+      if(g.method == "sl") {
 
-        g.split.index.list <- randomized.split(nrow(A), g.num.folds)
+        for(split.num in 1:g.num.splits) {
 
-        for(index in g.split.index.list) {
+          g.split.index.list <- randomized.split(nrow(A), g.num.folds)
 
-          if(is.null(W)) {
+          for(index in g.split.index.list) {
 
-            X.training <- A[-index, -i, drop = FALSE]
-            X.validation <- A[index, -i, drop = FALSE]
+            if(is.null(W)) {
 
-          } else if(ncol(A) == 1 || !adjust.for.other.As) {
+              X.training <- A[-index, -i, drop = FALSE]
+              X.validation <- A[index, -i, drop = FALSE]
 
-            X.training <- W[-index, , drop = FALSE]
-            X.validation <- W[index, , drop = FALSE]
+            } else if(ncol(A) == 1 || !adjust.for.other.As) {
 
-          } else {
+              X.training <- W[-index, , drop = FALSE]
+              X.validation <- W[index, , drop = FALSE]
 
-            X.training <- cbind(A[-index, -i, drop = FALSE],
-                                W[-index, , drop = FALSE])
-            X.validation <- cbind(A[index, -i, drop = FALSE],
-                                  W[index, , drop = FALSE])
+            } else {
 
-          }
+              X.training <- cbind(A[-index, -i, drop = FALSE],
+                                  W[-index, , drop = FALSE])
+              X.validation <- cbind(A[index, -i, drop = FALSE],
+                                    W[index, , drop = FALSE])
 
-          Y.training <- A[-index, i, drop = FALSE]
+            }
 
-          for(candidate in g.sl.cands) {
+            Y.training <- A[-index, i, drop = FALSE]
 
-            g.Z[index, candidate] <-
-              tryCatch(candidate.functions[[candidate]](X.training,
-                                                        Y.training,
-                                                        X.validation)$preds,
-                       error = function(e) {
+            for(candidate in g.sl.cands) {
 
-                         warning("the candidate ", candidate,
-                                 " threw an error during cross-validation.\n",
-                                 "The call was: ", e$call, "\n",
-                                 "The error message was: ",
-                                 e[["message"]], "\n",
-                                 "This candidate will be ignored for this ",
-                                 "g model,\nwhich is for exposure ", i, " (",
-                                 names(A)[i], ")")
-                         as.double(NA)
-                       })
-          }           
-        } ## end fold loop
+              g.Z[index, candidate] <-
+                tryCatch(candidate.functions[[candidate]](
+                                    X.training, Y.training, X.validation,
+                                    standardize = standardize)$preds,
+                         error = function(e) {
 
-        g.cv.risk.array[i, split.num, ] <- apply(g.Z, 2, get.log.likelihood,
-                                                 A[,i])
+                           warning("the candidate ", candidate,
+                                   " threw an error during cross-validation.\n",
+                                   "The call was: ", e$call, "\n",
+                                   "The error message was: ",
+                                   e[["message"]], "\n",
+                                   "This candidate will be ignored for this ",
+                                   "g model,\nwhich is for exposure ", i, " (",
+                                   names(A)[i], ")")
+                           as.double(NA)
+                         })
+            }
+          } ## end fold loop
 
-      } ## end split loop
+          g.cv.risk.array[i, split.num, ] <- apply(g.Z, 2, get.log.likelihood,
+                                                   A[,i])
 
-      ## select best candidate
+        } ## end split loop
 
-      if(g.num.splits == 1) {
+        ## select best candidate
 
-        ## subsetting g.cv.risk.array will cause dim to be dropped
+        if(g.num.splits == 1) {
+
+          ## subsetting g.cv.risk.array will cause dim to be dropped
         
-        max.index <- which.max(g.cv.risk.array[i, , ])
+          max.index <- which.max(g.cv.risk.array[i, , ])
 
-      } else {
+        } else {
 
-        ## g.num.splits is > 1, so average over the splits
+          ## g.num.splits is > 1, so average over the splits
 
-        max.index <- which.max(apply(g.cv.risk.array[i, , ], 2, mean))
+          max.index <- which.max(apply(g.cv.risk.array[i, , ], 2, mean))
 
-      }
+        }
 
-      if(length(max.index) == 0)
-        stop("there were no non-NA results in the ",
-             "cross-validation for the g model for exposure ", i, " (",
-             names(A)[i], ")")
+        if(length(max.index) == 0)
+          stop("there were no non-NA results in the ",
+               "cross-validation for the g model for exposure ", i, " (",
+               names(A)[i], ")")
 
-      g.winning.cands[i] <- g.sl.cands[max.index]
+        g.winning.cands[i] <- g.sl.cands[max.index]
 
-      if(verbose) cat("Winning candidate for exposure", i, "is",
-                      g.winning.cands[i], "\n")
-
-    } ## end if using sl for g
+        if(verbose) cat("Winning candidate for exposure", i, "is",
+                        g.winning.cands[i], "\n")
 
 ##################### calculate g(0,W) using the correct model #################
 
-    ## which model?
+        ## which model?
 
-    if(g.method == "sl") {
-      fun.to.use <- g.winning.cands[i]
-    } else fun.to.use <- g.method
+        fun.to.use <- g.winning.cands[i]
 
-    ## use correct predictors (depending on W and adjust.for.other.As)
+      } else { ## g.method is not "sl"
 
-    if(is.null(W)) {
-
-      g.predictors <- A[, -i, drop = FALSE]
-
-    } else if(ncol(A) == 1 || !adjust.for.other.As) {
-
-      g.predictors <- W
-
-    } else {
-
-      g.predictors <- cbind(A[ , -i, drop = FALSE], W)
-
-    }
-
-    g.model <- candidate.functions[[fun.to.use]](g.predictors,
-                                                 A[, i, drop = FALSE],
-                                                 g.predictors)
-    g0W <- 1 - g.model$preds
-
-    if(return.final.models) g.final.models[[i]] <- g.model
-    
-    rm(g.predictors)
-
-    ## truncate unless truncate is FALSE
-
-    truncation.occurred <- FALSE
-
-    if(!identical(truncate, FALSE)) {
-
-      if(any(g0W < truncate)) {
-        truncation.occurred <- TRUE
-        g0W[g0W < truncate] <- truncate
+        fun.to.use <- g.method
       }
-    }
 
+      ## use correct predictors (depending on W and adjust.for.other.As)
+
+      if(is.null(W)) {
+
+        g.predictors <- A[, -i, drop = FALSE]
+
+      } else if(ncol(A) == 1 || !adjust.for.other.As) {
+
+        g.predictors <- W
+
+      } else {
+
+        g.predictors <- cbind(A[ , -i, drop = FALSE], W)
+
+      }
+
+      g.model <- candidate.functions[[fun.to.use]](g.predictors,
+                                                   A[, i, drop = FALSE],
+                                                   g.predictors,
+                                                   standardize = standardize)
+      g0W <- 1 - g.model$preds
+
+      if(return.final.models) g.final.models[[i]] <- g.model
+    
+      rm(g.predictors)
+
+      ## truncate unless truncate is FALSE
+
+      truncation.occurred <- FALSE
+
+      if(!identical(truncate, FALSE)) {
+
+        if(any(g0W < truncate)) {
+          truncation.occurred <- TRUE
+          g0W[g0W < truncate] <- truncate
+        }
+      }
+    } ## end if do.g
+      
     ## prepare for Q modeling loop
 
-    if(double.robust) {
+    if(do.Q) {
 
       if(is.null(W)) {
         
@@ -1239,7 +1344,7 @@ multiPIM <- function(Y, A, W = NULL, ## data frames
       if(verbose) cat("Starting on outcome number", j, "of", ncol(Y),
                       "in inner loop\n")
 
-      if(double.robust) {
+      if(do.Q) {
 
         if(Q.method == "sl") {
 
@@ -1274,10 +1379,9 @@ multiPIM <- function(Y, A, W = NULL, ## data frames
               for(candidate in Q.sl.cands) {
 
                 tryCatch(Q.Z[index, candidate] <-
-                         candidate.functions[[candidate]](X.training,
-                                                          Y.training,
-                                                          X.validation,
-                                                          force = force)$preds,
+                         candidate.functions[[candidate]](
+                                         X.training, Y.training, X.validation,
+                                         force, standardize)$preds,
                          error = function(e){
 
                            warning("the candidate ", candidate,
@@ -1343,65 +1447,110 @@ multiPIM <- function(Y, A, W = NULL, ## data frames
           if(verbose) cat("Winning Q candidate for exposure", i, "and outcome",
                           j, "is", Q.winning.cands[i, j], "\n")
 
-        } ## end if Q.method == "sl"
+          ## do actual Q models depending on method or winning candidate
 
-        ## do actual Q models depending on method or winning candidate
+          ## which model?
 
-        ## which model?
-
-        if(Q.method == "sl") {
           fun.to.use <- Q.winning.cands[i, j]
-        } else fun.to.use <- Q.method
 
+        } else { ## Q.method is not "sl"
+
+          fun.to.use <- Q.method
+        }
+        
         ## correct predictors were already set above
 
         Q.model <-
           candidate.functions[[fun.to.use]](Q.predictors, Y[, j, drop = FALSE],
-                                            Q.predictors.0, force = force)
+                                            Q.predictors.0, force, standardize)
         Q0W <- Q.model$preds
 
         if(return.final.models)
           Q.final.models[[i]][[j]] <- Q.model
-        
-        ## Calculate the DR-IPCW estimate for exposure i and outcome j
 
-        indicator.Ai.is.zero <- as.double(!as.logical(A[,i]))
+        Ai.logical <- !as.logical(A[,i])
 
-        weights <- indicator.Ai.is.zero / g0W
+        indicator.Ai.is.zero <- as.double(Ai.logical)
 
-        final.vector <- ( weights * Y[, j] -
-                         (indicator.Ai.is.zero - g0W) * Q0W / g0W
-                         - mean(Y[, j]) )
+        if(estimator == "TMLE") {
 
-        param.estimates[i, j] <- mean(final.vector)
-        stand.errs[i, j] <- sd(final.vector) / sqrt(nrow(Y))
+          ZAW <- indicator.Ai.is.zero / ifelse(Ai.logical, 1 - g.model$preds,
+                                               g.model$preds)
 
-      } else { ## double robust is FALSE, use regular IPCW
+          Ybar <- mean(Y[, j])
+            
+          if(identical(Q.type, "binary.outcome")) {
+
+            eps.hat <- glm(Y[, j] ~ 0 + ZAW,
+                           offset = qlogis(Q.model$fitted),
+                           family = binomial)$coeff
+
+            QhatEps0W <- plogis(qlogis(Q0W) + eps.hat / g0W)
+
+            EhatY0 <- mean(QhatEps0W)
+
+            Ybar <- mean(Y[, j])
+            
+            param.estimates[i, j] <- EhatY0 - Ybar
+            IC <- (ZAW * (Y[, j] - QhatEps0W) + QhatEps0W - EhatY0) - (Y[, j] - Ybar)
+            stand.errs[i, j] <- sd(IC) / sqrt(nrow(Y))
+
+          } else { ## continuous outcome
+
+            eps.hat <- lm(Y[, j] ~ 0 + ZAW, offset = Q.model$fitted)$coeff
+
+            QhatEps0W <- Q0W + eps.hat / g0W
+
+            EhatY0 <- mean(QhatEps0W)
+
+            param.estimates[i, j] <- EhatY0 - Ybar
+            IC <- (ZAW * (Y[, j] - QhatEps0W) + QhatEps0W - EhatY0) - (Y[, j] - Ybar)
+            stand.errs[i, j] <- sd(IC) / sqrt(nrow(Y))
+
+          }
+
+        } else if(estimator == "DR-IPCW") {
+
+          ## Calculate the DR-IPCW estimate for exposure i and outcome j
+
+          weights <- indicator.Ai.is.zero / g0W
+
+          final.vector <- ( weights * Y[, j] -
+                           (indicator.Ai.is.zero - g0W) * Q0W / g0W
+                           - mean(Y[, j]) )
+          param.estimates[i, j] <- mean(final.vector)
+          stand.errs[i, j] <- sd(final.vector) / sqrt(nrow(Y))
+
+        } else if(estimator == "G-COMP") {
+
+          param.estimates[i, j] <- mean(Q0W) - mean(Y[, j])
+
+        } else stop("Internal Error 55")
+
+      } else { ## do.Q is FALSE, use regular IPCW
 
         final.vector <- (as.double(!as.logical(A[,i])) * Y[,j] / g0W
                          - mean(Y[,j]))
-
         param.estimates[i, j] <- mean(final.vector)
         stand.errs[i, j] <- sd(final.vector) / sqrt(nrow(Y))
 
-      } ## end else for which double.robust is FALSE
+      } ## end else for which do.Q is FALSE
     } ## end inner loop over outcomes
   } ## end main loop over exposures
 
-
-  if(!double.robust || Q.method != "sl") {
+  if(!do.Q || Q.method != "sl") {
     Q.sl.cands <- NA
     Q.num.folds <- NA
     Q.num.splits <- NA
     Q.winning.cands <- NA
   }
 
-  if(!double.robust) {
+  if(!do.Q) {
     Q.method <- NA
     Q.type <- NA
   }
 
-  if(g.method != "sl") {
+  if(!do.g || g.method != "sl") {
 
     g.sl.cands <- NA
     g.num.folds <- NA
@@ -1409,6 +1558,12 @@ multiPIM <- function(Y, A, W = NULL, ## data frames
     g.winning.cands <- NA
   }
 
+  if(!do.g) {
+    g.method <- NA
+    truncation.occurred <- NA
+    truncate <- NA
+  }
+  
   if(is.null(W)) {
     W.names <- NA
   } else W.names <- names(W)
@@ -1441,6 +1596,7 @@ multiPIM <- function(Y, A, W = NULL, ## data frames
                      adjust.for.other.As = adjust.for.other.As,
                      truncate = truncate,
                      truncation.occurred = truncation.occurred,
+                     standardize = standardize,
                      boot.param.array = NULL)
 
   class(return.val) <- "multiPIM"
@@ -1460,10 +1616,9 @@ multiPIMboot <- function(Y, A, W = NULL,
                          multicore = FALSE,
                          mc.num.jobs,
                          rlecuyer.seed = rep(12345, 6),
-                         estimator = c("DR-IPCW", "IPCW"),
-                         g.method = "sl",
-                         g.sl.cands = default.bin.cands,
-                         g.num.folds = 5, g.num.splits = 1,
+                         estimator = c("TMLE", "DR-IPCW", "IPCW", "G-COMP"),
+                         g.method = "main.terms.logistic", g.sl.cands = NULL,
+                         g.num.folds = NULL, g.num.splits = NULL,
                          Q.method = "sl", Q.sl.cands = "default",
                          Q.num.folds = 5, Q.num.splits = 1,
                          Q.type = NULL,
@@ -1473,6 +1628,7 @@ multiPIMboot <- function(Y, A, W = NULL,
                          na.action,
                          verbose = FALSE,
                          extra.cands = NULL,
+                         standardize = TRUE,
                          ...) {
 
   if( !( (mode(times) == "numeric") && (length(times) == 1) &&
@@ -1600,7 +1756,8 @@ multiPIMboot <- function(Y, A, W = NULL,
                        na.action,
                        check.input = TRUE,
                        verbose = FALSE,
-                       extra.cands)
+                       extra.cands,
+                       standardize)
 
   if(multicore) {
 
@@ -1679,7 +1836,8 @@ multiPIMboot <- function(Y, A, W = NULL,
                                     na.action,
                                     check.input = FALSE,
                                     verbose = FALSE,
-                                    extra.cands)$param.estimates
+                                    extra.cands,
+                                    standardize)$param.estimates
     }
 
     if(multicore)
@@ -1766,6 +1924,14 @@ summary.multiPIM <- function(object,
     summary.array[,,2] <- alternative.se.matrix
     stand.err.type <- "alternative"
   } else if(use.plug.in.se) {
+
+    if(identical(object$plug.in.stand.errs, NA)
+       && object$estimator == "G-COMP")
+      stop("When using the G-COMP estimator, no plug-in standard errors are",
+           "\navailable and thus no summary table can be provided.",
+           "\nStandard errors can be estimated by bootstrapping\n",
+           "e.g. by using the multiPIMboot function instead of multiPIM.\n")
+    
     summary.array[,,2] <- object$plug.in.stand.errs
     stand.err.type <- "plug.in"
   } else if(!use.plug.in.se) {
