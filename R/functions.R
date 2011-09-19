@@ -1517,7 +1517,7 @@ multiPIM <- function(Y, A, W = NULL, ## data frames
 
           final.vector <- ( weights * Y[, j] -
                            (indicator.Ai.is.zero - g0W) * Q0W / g0W
-                           - mean(Y[, j]) )
+                           - Y[, j] )
           param.estimates[i, j] <- mean(final.vector)
           stand.errs[i, j] <- sd(final.vector) / sqrt(nrow(Y))
 
@@ -1530,7 +1530,7 @@ multiPIM <- function(Y, A, W = NULL, ## data frames
       } else { ## do.Q is FALSE, use regular IPCW
 
         final.vector <- (as.double(!as.logical(A[,i])) * Y[,j] / g0W
-                         - mean(Y[,j]))
+                         - Y[,j] )
         param.estimates[i, j] <- mean(final.vector)
         stand.errs[i, j] <- sd(final.vector) / sqrt(nrow(Y))
 

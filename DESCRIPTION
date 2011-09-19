@@ -1,6 +1,6 @@
 Package: multiPIM
-Version: 1.1-1
-Date: 2011-09-14
+Version: 1.1-2
+Date: 2011-09-19
 Title: Variable Importance Analysis with Population Intervention Models
 Author: Stephan Ritter <sritter@berkeley.edu>, Alan Hubbard
         <hubbard@berkeley.edu>, Nicholas Jewell <jewell@berkeley.edu>
@@ -19,6 +19,6 @@ Description: Performs variable importance analysis for possibly many
         bootstrapping.
 License: GPL (>= 3)
 URL: http://www.stat.berkeley.edu/users/sritter/multiPIM/
-Packaged: 2011-09-14 17:06:20 UTC; sritter
+Packaged: 2011-09-19 21:56:10 UTC; sritter
 Repository: CRAN
-Date/Publication: 2011-09-14 19:29:07
+Date/Publication: 2011-09-20 19:28:11
