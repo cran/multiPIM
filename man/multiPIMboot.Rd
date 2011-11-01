@@ -29,7 +29,7 @@
   \item{times}{single integer greater than or equal to 2. The number of bootstrap replicates of \code{Y}, \code{A} and \code{W} to generate and pass to \code{\link{multiPIM}}.}
   \item{id}{vector which identifies clusters. If obervations i and j are in the same cluster, then \code{id[i]} should be equal to \code{id[j]}. Bootstrapping will be carried out by sampling with replacement from the clusters. Keeping the default value will result in sampling with replacement from the observations (i.e. no clustering).}
   \item{multicore}{logical value indicting whether bootstrapping should be done using multiple simultaneous jobs (requires that CRAN packages \emph{multicore} and \emph{rlecuyer} are installed).}
-  \item{mc.num.jobs}{number of simultaneous multicore jobs, e.g. if you want to use a quad core processor with hyperthreading, use \code{mc.num.jobs = 8}. If \code{multicore} is \code{TRUE} and no value is specified for this argument, an attempt is made to detect the number of available cores. Will be ignored if \code{multicore} is \code{FALSE}.}
+  \item{mc.num.jobs}{number of simultaneous multicore jobs, e.g. if you want to use a quad core processor with hyperthreading, use \code{mc.num.jobs = 8}. This must be specified whenever \code{multicore} is true. Automatic detection of the number of cores is no longer available.}
   \item{rlecuyer.seed}{vector of length 6 defining a seed to set for the \emph{rlecuyer} package (see \code{\link[rlecuyer]{.lec.SetPackageSeed}}). Will be ignored if \code{multicore} is \code{FALSE}. If \code{mulicore} is \code{FALSE}, one \dQuote{should} (depending on the candidates used) be able to get reprodicible results by setting the seed normally (with \code{\link[base]{set.seed}}) prior to running multiPIMboot.}
   \item{estimator}{the estimator to be used. The default is \code{"TMLE"}, for the targeted maximum likelihood estimator. Alternatively, one may specify \code{"DR-IPCW"}, for the Double-Robust Inverse Probability of Censoring-Weighted estimator, or \code{"IPCW"}, for the regular IPCW estimator. If the regular IPCW estimator is selected, all arguments which begin with the letter Q are ignored, since only g (the regression of each exposure on possible confounders) needs to be modeled in this case.}
   \item{g.method}{a length one character vector indicating the regression method to use in modelling g. The default value, \code{"main.terms.logistic"}, is meant to be used with the default TMLE estimator. If a different estimator is used, it is recommended to use super learning by specifying \code{"sl"}. In this case, the arguments \code{g.sl.cands}, \code{g.num.folds} and \code{g.num.splits} must also be specified. Other possible values for the \code{g.method} argument are: one of the elements of the vector \code{\link{all.bin.cands}}, or, if \code{extra.cands} is supplied, one of the names of the \code{extra.cands} list of functions. Ignored if \code{estimator} is \code{"G-COMP"}.}
@@ -112,7 +112,7 @@ van der Laan, Mark J., Polley, Eric C. and Hubbard, Alan E. (2007) \dQuote{Super
 \seealso{
 \code{\link{multiPIM}} for the main function which is called by \code{multiPIMboot}.
 
-\code{\link{summary.multiPIM}} for a printing summaries of the results.
+\code{\link{summary.multiPIM}} for printing summaries of the results.
 
 \code{\link{Candidates}} to see which candidates are currently available, and for information on writing user-defined super learner candidates and regression methods.
 }
@@ -128,6 +128,4 @@ example(multiPIM)
 
 boot.result <- multiPIMboot(Y, A)
 
-summary(boot.result)
-}
-}
+summary(boot.result)}}

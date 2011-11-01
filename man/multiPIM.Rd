@@ -201,6 +201,8 @@ van der Laan, Mark J., Polley, Eric C. and Hubbard, Alan E. (2007) \dQuote{Super
 num.columns <- 3
 num.obs <- 250
 
+set.seed(23)
+
 ## use rbinom with size = 1 to make a data frame of binary data
 
 A <- as.data.frame(matrix(rbinom(num.columns*num.obs, 1, .5),
@@ -221,12 +223,4 @@ names(Y) <- paste("Y", 1:num.columns, sep = "")
 
 result <- multiPIM(Y, A)
 
-summary(result)
-## notice that for the pairs Ai vs. Yi, i = 1 to 3,
-## the adjusted p values get progressively lower,
-## since Y[,i] is i * A[,i] plus noise. However, off-diagonal p values
-## are higher since there is no dependence of Y[,i] on A[,j] when i != j.
-## There is a corresponding trend in the actual parameter estimates,
-## which get progressively more negative for the diagonal (Ai vs. Yi, i = 1 to 3)
-## exposure-outcome pairs.
-}
+summary(result)}

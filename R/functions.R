@@ -470,7 +470,7 @@ multiPIM <- function(Y, A, W = NULL, ## data frames
 
         if(length(truncate) != 1 || mode(truncate) != "numeric" || truncate <= 0
            || truncate > 0.5)
-          stop("the truncate argument must be either FALSE or",
+          stop("the truncate argument must be either FALSE or\n",
                "a number greater than 0 and less than 0.5")
       }
     }
@@ -874,8 +874,8 @@ multiPIM <- function(Y, A, W = NULL, ## data frames
 
         result$main.model <- polymars(Y[, 1], expanded.X,
                                       startmodel = startmodel)
-        result$preds <- predict(result$main.model, x = expanded.newX)
-        result$fitted <- predict(result$main.model, x = expanded.X)
+        result$preds <- as.vector(predict(result$main.model, x = expanded.newX))
+        result$fitted <- as.vector(predict(result$main.model, x = expanded.X))
         
         return(result)
       }
@@ -1489,10 +1489,10 @@ multiPIM <- function(Y, A, W = NULL, ## data frames
 
             EhatY0 <- mean(QhatEps0W)
 
-            Ybar <- mean(Y[, j])
-            
             param.estimates[i, j] <- EhatY0 - Ybar
-            IC <- (ZAW * (Y[, j] - QhatEps0W) + QhatEps0W - EhatY0) - (Y[, j] - Ybar)
+
+            IC <- ((ZAW * (Y[, j] - QhatEps0W) + QhatEps0W - EhatY0)
+                   - (Y[, j] - Ybar))
             stand.errs[i, j] <- sd(IC) / sqrt(nrow(Y))
 
           } else { ## continuous outcome
@@ -1504,7 +1504,8 @@ multiPIM <- function(Y, A, W = NULL, ## data frames
             EhatY0 <- mean(QhatEps0W)
 
             param.estimates[i, j] <- EhatY0 - Ybar
-            IC <- (ZAW * (Y[, j] - QhatEps0W) + QhatEps0W - EhatY0) - (Y[, j] - Ybar)
+            IC <- ((ZAW * (Y[, j] - QhatEps0W) + QhatEps0W - EhatY0)
+                   - (Y[, j] - Ybar))
             stand.errs[i, j] <- sd(IC) / sqrt(nrow(Y))
 
           }
@@ -1530,7 +1531,7 @@ multiPIM <- function(Y, A, W = NULL, ## data frames
       } else { ## do.Q is FALSE, use regular IPCW
 
         final.vector <- (as.double(!as.logical(A[,i])) * Y[,j] / g0W
-                         - Y[,j] )
+                         - Y[, j] )
         param.estimates[i, j] <- mean(final.vector)
         stand.errs[i, j] <- sd(final.vector) / sqrt(nrow(Y))
 
@@ -1660,22 +1661,13 @@ multiPIMboot <- function(Y, A, W = NULL,
 
     ## check mc.num.jobs
 
-    if(missing(mc.num.jobs)) {
+    if(missing(mc.num.jobs))
+      stop("if multicore = TRUE, mc.num.jobs must.be.specified")
 
-      mc.num.jobs <- multicore:::detectCores(all.tests=TRUE)
-
-      if(is.na(mc.num.jobs))
-        stop("unable to detect number of cores. mc.num.jobs must be specified")
-
-    } else {
-
-      if(mode(mc.num.jobs) != "numeric" || length(mc.num.jobs) != 1
-         || mc.num.jobs < 1 || mc.num.jobs %% 1 != 0)
-        stop("mc.num.jobs should be a single integer giving the number of\n",
-             "(virtual) cores to be used, or do not specify a value\n",
-             "for mc.num.cores, in order to detect number of cores\n",
-             "automatically")
-    }
+    if(mode(mc.num.jobs) != "numeric" || length(mc.num.jobs) != 1
+       || mc.num.jobs < 1 || mc.num.jobs %% 1 != 0)
+      stop("mc.num.jobs should be a single integer giving the number of\n",
+           "cores/CPUs to be used")
 
     ## set mc.num.jobs to times if it's greater
 
@@ -1980,21 +1972,32 @@ print.summary.multiPIM <- function(x, by.exposure, digits, ...) {
 
   if(missing(digits)) digits <- x$digits
 
-  cat("\n\n")
+  cat("\n")
 
-  if(dim(x$summary.array)[1] == 1) {
+  if(all(dim(x$summary.array)[c(1,2)] == 1)) {
+    ## i.e. if num.exposures==1 and num.outcomes==1 
+
+    cat("Results for the exposure \"", dimnames(x$summary.array)[[1]],
+        "\" vs the outcome \"", dimnames(x$summary.array)[[2]], "\"\n\n",
+        sep = "")
+    print(x$summary.array[1, 1, ], digits = digits, ...)
+    cat("\n")
+
+  } else if(dim(x$summary.array)[1] == 1) {
+    ## i.e. if num.exposures==1 
 
     cat("Results for the exposure \"", dimnames(x$summary.array)[[1]],
         "\" vs the outcomes listed on the left:\n", sep = "")
     print(x$summary.array[1,,], digits = digits, ...)
-    cat("\n\n")
+    cat("\n")
 
   } else if(dim(x$summary.array)[2] == 1) {
-
+    ## i.e. if num.outcomes==1
+    
     cat("Results for the exposures listed on the left vs the outcome \"",
         dimnames(x$summary.array)[[2]], "\":\n", sep = "")
     print(x$summary.array[,1,], digits = digits, ...)
-    cat("\n\n")
+    cat("\n")
 
   } else if(by.exposure) {
 
@@ -2002,7 +2005,7 @@ print.summary.multiPIM <- function(x, by.exposure, digits, ...) {
       cat("Results for the exposure \"", dimnames(x$summary.array)[[1]][i],
         "\" vs the outcomes listed on the left:\n", sep = "")
       print(x$summary.array[i,,], digits = digits, ...)
-      cat("\n\n")
+      cat("\n")
     }
 
   } else {
@@ -2011,7 +2014,7 @@ print.summary.multiPIM <- function(x, by.exposure, digits, ...) {
       cat("Results for the exposures listed on the left vs the outcome \"",
           dimnames(x$summary.array)[[2]][i], "\":\n", sep = "")
       print(x$summary.array[,i,], digits = digits, ...)
-      cat("\n\n")
+      cat("\n")
     }
   }
 

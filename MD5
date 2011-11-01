@@ -1,8 +1,8 @@
-ab245b4d09f4541f8c0221dc955bdb89 *DESCRIPTION
+6373194d502d69cbfa100d7e40cf30b8 *DESCRIPTION
 79721c6951cf20aa3827ae398985fe86 *NAMESPACE
-706cf7d9ddeae85326e27683ccd2b544 *R/functions.R
+ccb3004ff1070ea7f833a2c6ac508769 *R/functions.R
 f22d7701a9e76f20f01d623da1db6dd2 *R/zzz.R
-6512e69f491d6ea10f2097ab3eabf16f *man/Candidates.Rd
-fbb7644ec824c92b582378ca2e8da979 *man/multiPIM.Rd
-a4895c3d614e03f03be30b86b34cfaca *man/multiPIMboot.Rd
+96d4e64126d304dff970b1cdb36236c7 *man/Candidates.Rd
+12078074e08179c7df53419287e6d8ba *man/multiPIM.Rd
+f7fceee6faeaf7912222dc6351a17fc0 *man/multiPIMboot.Rd
 03355a487f31465e75418ebb201b85a9 *man/summary.multiPIM.Rd

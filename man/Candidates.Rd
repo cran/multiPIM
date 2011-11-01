@@ -8,12 +8,15 @@
 \description{When the \bold{multiPIM} package is loaded, four character vectors are made available to the user. They are defined as follows:
 
 \preformatted{all.bin.cands <- c("polyclass", "penalized.bin", "main.terms.logistic",
-                   "rpart.bin")}
-\preformatted{all.cont.cands <- c("polymars", "lars", "main.terms.linear", "penalized.cont",
-                    "rpart.cont")}
-\code{default.bin.cands <- c("polyclass", "penalized.bin", "main.terms.logistic")}
+                   "rpart.bin")
 
-\code{default.cont.cands <- c("polymars", "lars", "main.terms.linear")}
+default.bin.cands <- c("polyclass", "penalized.bin", "main.terms.logistic")
+
+all.cont.cands <- c("polymars", "lars", "main.terms.linear", "penalized.cont",
+                    "rpart.cont")
+
+default.cont.cands <- c("polymars", "lars", "main.terms.linear")
+}
 
 These vectors (or subsets thereof) can be supplied as arguments to the \code{multiPIM} and the \code{multiPIMboot} functions, in order to specify which regression methods should be used to estimate the nuisance parameters g(0, W) and Q(0|W). The user may also supply custom written regression methods or super learner candidates. The mechanism for this is described in a section below.}
 
