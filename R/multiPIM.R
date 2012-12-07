@@ -1,13 +1,13 @@
 ################################################################################
 ################################################################################
-################################## functions.R #################################
+################################## multiPIM.R ##################################
 ################################################################################
 ################################################################################
 
 ## Author: Stephan Ritter
 
-## R functions and object definitions for the multiPIM package
-## 4 character vectors and 4 functions are made available to the user.
+## File containg definition of main function for multiPIM package.
+## In addition, 4 character vectors are made available to the user.
 
 ## The character vectors are:
 
@@ -16,12 +16,7 @@
 ## default.bin.cands
 ## default.cont.cands
 
-## The functions are:
-
-## multiPIM
-## multiPIMboot
-## summary.multiPIM
-## print.summary.multiPIM
+## The function is called multiPIM
 
 ################################################################################
 ############################## define candidates ###############################
@@ -70,6 +65,10 @@ multiPIM <- function(Y, A, W = NULL, ## data frames
                      standardize = TRUE, ## applies to lars and penalized cands
                      ...) {
 
+  ## Save start time
+
+  start.time <- Sys.time()
+  
 ################################ check input ###################################
 
   ## check check.input
@@ -1125,52 +1124,83 @@ multiPIM <- function(Y, A, W = NULL, ## data frames
 
   ## prepare for modeling the g's
 
-  if(do.g && g.method == "sl") {
+  if(do.g) {
 
-    ## generate matrix to store x-validation predictions
+    ## keep track of time taken for g modeling
+    
+    g.time <- 0
 
-    g.Z <- matrix(0, nrow = nrow(A), ncol = length(g.sl.cands))
-    colnames(g.Z) <- g.sl.cands
+    if(g.method == "sl") {
 
-    ## array to store x-val results
+      ## keep track of time for doing x-val part of sl for g
 
-    g.cv.risk.array <- array(0, dim = c(ncol(A), g.num.splits,
-                                        length(g.sl.cands)),
-                             dimnames = list(exposure = names(A),
-                                             split.num = 1:g.num.splits,
-                                             candidate = g.sl.cands))
+      g.sl.time <- 0
 
-    ## character vector to store which candidate won for each exposure
+      ## and time by candidate
 
-    g.winning.cands <- vector("character", length = ncol(A))
-    names(g.winning.cands) <- names(A)
+      g.sl.cand.times <- rep(0, times = length(g.sl.cands))
+      names(g.sl.cand.times) <- g.sl.cands
+      
+      ## generate matrix to store x-validation predictions
 
+      g.Z <- matrix(0, nrow = nrow(A), ncol = length(g.sl.cands))
+      colnames(g.Z) <- g.sl.cands
+
+      ## array to store x-val results
+
+      g.cv.risk.array <- array(0, dim = c(ncol(A), g.num.splits,
+                                          length(g.sl.cands)),
+                               dimnames = list(exposure = names(A),
+                                               split.num = 1:g.num.splits,
+                                               candidate = g.sl.cands))
+
+      ## character vector to store which candidate won for each exposure
+
+      g.winning.cands <- vector("character", length = ncol(A))
+      names(g.winning.cands) <- names(A)
+    }
   }
 
   ## prepare for modeling the Q's
 
-  if(do.Q && Q.method == "sl") {
+  if(do.Q) {
 
-    ## generate matrix to store x-validation predictions
+    ## keep track of time taken for Q modeling
 
-    Q.Z <- matrix(0, nrow = nrow(Y), ncol = length(Q.sl.cands))
-    colnames(Q.Z) <- Q.sl.cands
+    Q.time <- 0
+    
+    if(Q.method == "sl") {
 
-    ## array to store x-val results
+      ## keep track of time for doing x-val part of sl for Q
 
-    Q.cv.risk.array <- array(0, dim = c(ncol(A), ncol(Y), Q.num.splits,
-                                        length(Q.sl.cands)),
-                             dimnames = list(exposure = names(A),
-                                             outcome = names(Y),
-                                             split.num = 1:Q.num.splits,
-                                             candidate = Q.sl.cands))
+      Q.sl.time <- 0
 
-    ## character matrix to store winning Q candidates
+      ## and time by candidate
 
-    Q.winning.cands <- matrix("", nrow = ncol(A), ncol = ncol(Y))
-    dimnames(Q.winning.cands) <- dimnames(param.estimates)
+      Q.sl.cand.times <- rep(0, times = length(Q.sl.cands))
+      names(Q.sl.cand.times) <- Q.sl.cands
+
+      ## generate matrix to store x-validation predictions
+ 
+      Q.Z <- matrix(0, nrow = nrow(Y), ncol = length(Q.sl.cands))
+      colnames(Q.Z) <- Q.sl.cands
+      
+      ## array to store x-val results
+
+      Q.cv.risk.array <- array(0, dim = c(ncol(A), ncol(Y), Q.num.splits,
+                                          length(Q.sl.cands)),
+                               dimnames = list(exposure = names(A),
+                                               outcome = names(Y),
+                                               split.num = 1:Q.num.splits,
+                                               candidate = Q.sl.cands))
+
+      ## character matrix to store winning Q candidates
+
+      Q.winning.cands <- matrix("", nrow = ncol(A), ncol = ncol(Y))
+      dimnames(Q.winning.cands) <- dimnames(param.estimates)
+    }
   }
-
+  
   if(verbose) cat("Starting main loop over exposures\n")
 
   for(i in 1:ncol(A)) { ## main exposure loop
@@ -1180,6 +1210,8 @@ multiPIM <- function(Y, A, W = NULL, ## data frames
 
     if(do.g) {
 
+      g.start.time <- Sys.time()
+      
       if(g.method == "sl") {
 
         for(split.num in 1:g.num.splits) {
@@ -1209,8 +1241,12 @@ multiPIM <- function(Y, A, W = NULL, ## data frames
 
             Y.training <- A[-index, i, drop = FALSE]
 
+            g.sl.start.time <- Sys.time()
+            
             for(candidate in g.sl.cands) {
 
+              g.cand.start.time <- Sys.time()
+              
               g.Z[index, candidate] <-
                 tryCatch(candidate.functions[[candidate]](
                                     X.training, Y.training, X.validation,
@@ -1227,7 +1263,21 @@ multiPIM <- function(Y, A, W = NULL, ## data frames
                                    names(A)[i], ")")
                            as.double(NA)
                          })
+
+              g.cand.end.time <- Sys.time()
+
+              g.sl.cand.times[candidate] <-
+                (g.sl.cand.times[candidate]
+                 + as.double(difftime(g.cand.end.time, g.cand.start.time,
+                                      units = "secs")))
             }
+
+            g.sl.end.time <- Sys.time()
+
+            g.sl.time <- g.sl.time + as.double(difftime(g.sl.end.time,
+                                                        g.sl.start.time,
+                                                        units = "secs"))
+
           } ## end fold loop
 
           g.cv.risk.array[i, split.num, ] <- apply(g.Z, 2, get.log.likelihood,
@@ -1309,6 +1359,12 @@ multiPIM <- function(Y, A, W = NULL, ## data frames
           g0W[g0W < truncate] <- truncate
         }
       }
+
+      g.end.time <- Sys.time()
+
+      g.time <- g.time + as.double(difftime(g.end.time, g.start.time,
+                                            units = "secs"))
+      
     } ## end if do.g
       
     ## prepare for Q modeling loop
@@ -1346,6 +1402,8 @@ multiPIM <- function(Y, A, W = NULL, ## data frames
 
       if(do.Q) {
 
+        Q.start.time <- Sys.time()
+      
         if(Q.method == "sl") {
 
           for(split.num in 1:Q.num.splits) {
@@ -1376,8 +1434,12 @@ multiPIM <- function(Y, A, W = NULL, ## data frames
                                       W[index, , drop = FALSE])
               }
 
+              Q.sl.start.time <- Sys.time()
+              
               for(candidate in Q.sl.cands) {
 
+                Q.cand.start.time <- Sys.time()
+                
                 tryCatch(Q.Z[index, candidate] <-
                          candidate.functions[[candidate]](
                                          X.training, Y.training, X.validation,
@@ -1395,9 +1457,21 @@ multiPIM <- function(Y, A, W = NULL, ## data frames
                                    names(Y)[j], ")")
                            as.double(NA)
                          })
+
+                Q.cand.end.time <- Sys.time()
+
+                Q.sl.cand.times[candidate] <-
+                  (Q.sl.cand.times[candidate]
+                   + as.double(difftime(Q.cand.end.time, Q.cand.start.time,
+                                        units = "secs")))
               }
 
-              
+              Q.sl.end.time <- Sys.time()
+
+              Q.sl.time <- Q.sl.time + as.double(difftime(Q.sl.end.time,
+                                                          Q.sl.start.time,
+                                                          units = "secs"))
+
             } ## end fold loop
 
             if(identical(Q.type, "binary.outcome")) {
@@ -1468,6 +1542,13 @@ multiPIM <- function(Y, A, W = NULL, ## data frames
         if(return.final.models)
           Q.final.models[[i]][[j]] <- Q.model
 
+        ## Done with Q modeling, record the time
+        
+        Q.end.time <- Sys.time()
+
+        Q.time <- Q.time + as.double(difftime(Q.end.time, Q.start.time,
+                                              units = "secs"))
+        
         Ai.logical <- !as.logical(A[,i])
 
         indicator.Ai.is.zero <- as.double(Ai.logical)
@@ -1544,11 +1625,14 @@ multiPIM <- function(Y, A, W = NULL, ## data frames
     Q.num.folds <- NA
     Q.num.splits <- NA
     Q.winning.cands <- NA
+    Q.sl.time <- NA
+    Q.sl.cand.times <- NA
   }
 
   if(!do.Q) {
     Q.method <- NA
     Q.type <- NA
+    Q.time <- NA
   }
 
   if(!do.g || g.method != "sl") {
@@ -1557,12 +1641,15 @@ multiPIM <- function(Y, A, W = NULL, ## data frames
     g.num.folds <- NA
     g.num.splits <- NA
     g.winning.cands <- NA
+    g.sl.time <- NA
+    g.sl.cand.times <- NA
   }
 
   if(!do.g) {
     g.method <- NA
     truncation.occurred <- NA
     truncate <- NA
+    g.time <- NA
   }
   
   if(is.null(W)) {
@@ -1572,6 +1659,10 @@ multiPIM <- function(Y, A, W = NULL, ## data frames
   if(ncol(A) == 1)
     adjust.for.other.As <- NA
 
+  ## get end time
+  
+  end.time <- Sys.time()
+  
   return.val <- list(param.estimates = param.estimates,
                      plug.in.stand.errs = stand.errs,
                      call = match.call(),
@@ -1598,425 +1689,18 @@ multiPIM <- function(Y, A, W = NULL, ## data frames
                      truncate = truncate,
                      truncation.occurred = truncation.occurred,
                      standardize = standardize,
-                     boot.param.array = NULL)
+                     boot.param.array = NULL,
+                     main.time = as.double(difftime(end.time, start.time,
+                                                    units = "secs")),
+                     g.time = g.time,
+                     Q.time = Q.time,
+                     g.sl.time = g.sl.time,
+                     Q.sl.time = Q.sl.time,
+                     g.sl.cand.times = g.sl.cand.times,
+                     Q.sl.cand.times = Q.sl.cand.times)
 
   class(return.val) <- "multiPIM"
 
   return(return.val)
 
 } ## end multiPIM function
-
-
-################################################################################
-########################### bootstrapping function #############################
-################################################################################
-
-multiPIMboot <- function(Y, A, W = NULL,
-                         times = 5000,
-                         id = 1:nrow(Y),
-                         multicore = FALSE,
-                         mc.num.jobs,
-                         rlecuyer.seed = rep(12345, 6),
-                         estimator = c("TMLE", "DR-IPCW", "IPCW", "G-COMP"),
-                         g.method = "main.terms.logistic", g.sl.cands = NULL,
-                         g.num.folds = NULL, g.num.splits = NULL,
-                         Q.method = "sl", Q.sl.cands = "default",
-                         Q.num.folds = 5, Q.num.splits = 1,
-                         Q.type = NULL,
-                         adjust.for.other.As = TRUE,
-                         truncate = 0.05,
-                         return.final.models = TRUE,
-                         na.action,
-                         verbose = FALSE,
-                         extra.cands = NULL,
-                         standardize = TRUE,
-                         ...) {
-
-  if( !( (mode(times) == "numeric") && (length(times) == 1) &&
-        !is.na(times) && ((times %% 1) == 0) && (times >= 2)) )
-    stop("times must be a single integer greater than or equal to 2")
-
-  if(length(id) != nrow(Y))
-    stop("id must have length equal to nrow(Y)")
-
-  if(!(identical(multicore, FALSE) || identical(multicore, TRUE)))
-    stop("argument multicore must be either TRUE or FALSE")
-  
-  if(!(identical(verbose, FALSE) || identical(verbose, TRUE)))
-    stop("argument verbose must be either TRUE or FALSE")
-
-  if(multicore) {
-
-    tryCatch(library(multicore), error = function(e) {
-
-      stop("unable to load package multicore. Error message was:\n",
-           e$message)
-    })
-
-    tryCatch(library(rlecuyer), error = function(e) {
-
-      stop("unable to load package rlecuyer. Error message was:\n",
-           e$message)
-    })
-
-    ## check mc.num.jobs
-
-    if(missing(mc.num.jobs))
-      stop("if multicore = TRUE, mc.num.jobs must.be.specified")
-
-    if(mode(mc.num.jobs) != "numeric" || length(mc.num.jobs) != 1
-       || mc.num.jobs < 1 || mc.num.jobs %% 1 != 0)
-      stop("mc.num.jobs should be a single integer giving the number of\n",
-           "cores/CPUs to be used")
-
-    ## set mc.num.jobs to times if it's greater
-
-    if(mc.num.jobs > times) mc.num.jobs <- times
-    
-    ## find out number of bootstrap samples per job
-    ## (the final job may have fewer samples than this)
-
-    samples.per.job <- (times + mc.num.jobs - 1) %/% mc.num.jobs
-
-    ## find out how many jobs really need to be run (this is important for
-    ## preventing errors when mc.num.jobs is not much less than times)
-
-    mc.num.jobs <- times %/% samples.per.job
-
-    if(times %% samples.per.job != 0) mc.num.jobs <- mc.num.jobs + 1
-
-    ## if final job would have zero samples, subtract 1 from mc.num.jobs
-
-    if( (mc.num.jobs - 1) * samples.per.job == times)
-      mc.num.jobs = mc.num.jobs - 1
-
-    ## check rlecuyer.seed
-
-    if(mode(rlecuyer.seed) != "numeric" || length(rlecuyer.seed) != 6
-       || any((rlecuyer.seed %% 1) != 0))
-      stop("rlecuyer.seed must be a vector of length 6 containing integers")
-
-    if(any(rlecuyer.seed < 0))
-      stop("all elements of rlecuyer.seed must be non-negative")
-    
-    if(all(rlecuyer.seed[1:3] == 0))
-      stop("at least one of the first three elements of rlecuyer.seed",
-           " must be non-zero")
-
-    if(any(rlecuyer.seed[1:3] >= 4294967087))
-      stop("first three elements of rlecuyer.seed must be < 4294967087")
-    
-    if(all(rlecuyer.seed[4:6] == 0))
-      stop("at least one of the final three elements of rlecuyer.seed",
-           " must be non-zero") 
-
-    if(any(rlecuyer.seed[4:6] >= 4294944443))
-      stop("final three elements of rlecuyer.seed must be < 4294944443")
-
-    ## set the seed and instantiate the streams
-    
-    .lec.SetPackageSeed(rlecuyer.seed)
-
-    stream.names <- as.character(0:mc.num.jobs)
-
-    .lec.CreateStream(stream.names)
-
-    ## set current generator to stream 0 (for the main run), save current kinds
-    
-    prev.RNG.kinds <- .lec.CurrentStream("0")
-    
-  } else { ## multicore is false
-
-    ## do everything in one job
-    
-    mc.num.jobs <- 1
-    samples.per.job <- times
-  }
-    
-  if(verbose) cat("Starting Main Run\n")
-
-  main.run <- multiPIM(Y, A, W,
-                       estimator,
-                       g.method, g.sl.cands,
-                       g.num.folds, g.num.splits,
-                       Q.method, Q.sl.cands,
-                       Q.num.folds, Q.num.splits,
-                       Q.type,
-                       adjust.for.other.As,
-                       truncate,
-                       return.final.models,
-                       na.action,
-                       check.input = TRUE,
-                       verbose = FALSE,
-                       extra.cands,
-                       standardize)
-
-  if(multicore) {
-
-    ## end current rlecuyer stream
-
-    .lec.CurrentStreamEnd()
-
-  }
-  
-  ## Prepare for getting bootstrap samples
-
-  unique.ids <- unique(id)
-
-  num.ids <- length(unique.ids)
-
-  id.index.list <- split(1:length(id), id)
-
-  bootstr.distr <- array(0, dim = c(times, dim(main.run$param.estimates)))
-
-  bootstrapped.W <- NULL
-  
-  ## set Q.type so that there will be no checking of Y
-  ## to determine which type to use
-
-  Q.type <- main.run$Q.type
-
-  run.one.job <- function(job.num) {
-
-    ## find out how many samples this job need to run
-
-    num.samples <- ifelse(job.num != mc.num.jobs, samples.per.job,
-                          (times - (job.num - 1) * samples.per.job))
-
-    ## instantiate an array to store results for this job
-
-    job.result <- array(0, dim = c(num.samples, dim(main.run$param.estimates)))
-
-    ## set the rlecuyer stream to use if multicore is true
-
-    if(multicore)
-      .lec.CurrentStream(as.character(job.num))
-
-    ## loop over samples
-
-    for(i in 1:num.samples) {
-
-      unique.id.index.sample <- sample(1:num.ids, num.ids, replace = T)
-
-      boot.index.vec <- unlist(id.index.list[unique.id.index.sample],
-                               use.names = FALSE)
-
-      if(!is.null(W)) bootstrapped.W <- W[boot.index.vec, , drop = FALSE]
-
-      if(verbose) {
-
-        if(multicore) {
-          cat("Starting bootstrap run number", i, "of", num.samples, "\n",
-              "for job number", job.num, "\n")
-        } else {
-          cat("Starting bootstrap run number", i, "of", num.samples, "\n")
-        }
-      }
-
-      job.result[i, , ] <- multiPIM(Y[boot.index.vec, , drop = FALSE],
-                                    A[boot.index.vec, , drop = FALSE],
-                                    bootstrapped.W,
-                                    estimator,
-                                    g.method, g.sl.cands,
-                                    g.num.folds, g.num.splits,
-                                    Q.method, Q.sl.cands,
-                                    Q.num.folds, Q.num.splits,
-                                    Q.type,
-                                    adjust.for.other.As,
-                                    truncate,
-                                    return.final.models = FALSE,
-                                    na.action,
-                                    check.input = FALSE,
-                                    verbose = FALSE,
-                                    extra.cands,
-                                    standardize)$param.estimates
-    }
-
-    if(multicore)
-      .lec.CurrentStreamEnd()
-
-    job.result
-  }
-
-  if(multicore) {
-
-    jobs <- lapply(1:mc.num.jobs, function(x) parallel(run.one.job(x),
-                                                       name = x))
-
-    results.list <- collect(jobs)
-
-    for(job.num in 1:mc.num.jobs) {
-
-      begin.index <- samples.per.job * (job.num - 1) + 1
-      end.index <- ifelse(job.num != mc.num.jobs, samples.per.job * job.num,
-                          times)
-      bootstr.distr[begin.index:end.index, , ] <- results.list[[job.num]]
-    }
-  } else {
-
-    bootstr.distr <- run.one.job(1)
-
-  }
-
-  if(multicore) {
-
-    ## delete the streams so that no warnings will be thrown if multiPIMboot
-    ## is run more than once
-
-    .lec.DeleteStream(stream.names)
-    
-    ## reset RNG kinds (seed will probably be reset)
-
-    RNGkind(prev.RNG.kinds[1], prev.RNG.kinds[2])
-  }
-    
-  dimnames(bootstr.distr) <- c(sample.number = list(1:times),
-                               dimnames(main.run$param.estimates))
-
-  main.run$call <- match.call()
-  main.run$boot.param.array <- bootstr.distr
-
-  return(main.run)
-
-} ## end multiPIMboot function
-
-
-################################################################################
-######################## summary method and its print method ###################
-################################################################################
-
-################# summary method for multiPIM objects ##########################
-
-summary.multiPIM <- function(object,
-                             use.plug.in.se = is.null(object$boot.param.array),
-                             alternative.se.matrix = NULL,
-                             two.sided.p.vals = TRUE,
-                             bf.multiplier = object$num.exp * object$num.out,
-                             by.exposure = TRUE,
-                             digits = 4,
-                             ...) {
-
-  ## add some error checking to this function eventually
-
-  sum.attributes <- c("param.estimate", "stand.error", "test.stat",
-                      "p.val", "p.val.bon.adj")
-
-  ## instantiate an array to hold summary info
-
-  summary.array <- array(0, dim = c(dim(object$param.estimates),
-                                    length(sum.attributes)))
-
-  ## param estimates
-
-  summary.array[,,1] <- object$param.estimates
-
-  ## stand.errs
-
-  if(!is.null(alternative.se.matrix)) {
-    summary.array[,,2] <- alternative.se.matrix
-    stand.err.type <- "alternative"
-  } else if(use.plug.in.se) {
-
-    if(identical(object$plug.in.stand.errs, NA)
-       && object$estimator == "G-COMP")
-      stop("When using the G-COMP estimator, no plug-in standard errors are",
-           "\navailable and thus no summary table can be provided.",
-           "\nStandard errors can be estimated by bootstrapping\n",
-           "e.g. by using the multiPIMboot function instead of multiPIM.\n")
-    
-    summary.array[,,2] <- object$plug.in.stand.errs
-    stand.err.type <- "plug.in"
-  } else if(!use.plug.in.se) {
-    summary.array[,,2] <- apply(object$boot.param.array, c(2,3), sd)
-    stand.err.type <- "bootstrap"
-  } else stop("internal error #1")
-
-  ## test stats = param estimates / stand errs
-
-  summary.array[,,3] <- abs(summary.array[,,1] / summary.array[,,2])
-
-  ## calculate p values
-
-  multiplier.1 <- ifelse(two.sided.p.vals, 2, 1)
-  summary.array[,,4] <- multiplier.1 * pnorm(summary.array[,,3],
-                                             lower.tail = FALSE)
-
-  ## get bonferroni p vals
-
-  summary.array[,,5] <- bf.multiplier * summary.array[,,4]
-  summary.array[,,5][summary.array[,,5] > 1] <- 1
-
-  ## add names
-
-  dimnames(summary.array) <- c(dimnames(object$param.estimates),
-                               list(sum.attributes))
-
-  summary.list <- list(summary.array = summary.array,
-                       two.sided.p.vals = two.sided.p.vals,
-                       stand.err.type = stand.err.type,
-                       bf.multiplier = bf.multiplier,
-                       by.exposure = by.exposure,
-                       digits = digits)
-
-  class(summary.list) <- "summary.multiPIM"
-
-  return(summary.list)
-
-}
-
-###################### print method for summary objects ########################
-
-print.summary.multiPIM <- function(x, by.exposure, digits, ...) {
-
-  if(missing(by.exposure)) by.exposure <- x$by.exposure
-
-  if(missing(digits)) digits <- x$digits
-
-  cat("\n")
-
-  if(all(dim(x$summary.array)[c(1,2)] == 1)) {
-    ## i.e. if num.exposures==1 and num.outcomes==1 
-
-    cat("Results for the exposure \"", dimnames(x$summary.array)[[1]],
-        "\" vs the outcome \"", dimnames(x$summary.array)[[2]], "\"\n\n",
-        sep = "")
-    print(x$summary.array[1, 1, ], digits = digits, ...)
-    cat("\n")
-
-  } else if(dim(x$summary.array)[1] == 1) {
-    ## i.e. if num.exposures==1 
-
-    cat("Results for the exposure \"", dimnames(x$summary.array)[[1]],
-        "\" vs the outcomes listed on the left:\n", sep = "")
-    print(x$summary.array[1,,], digits = digits, ...)
-    cat("\n")
-
-  } else if(dim(x$summary.array)[2] == 1) {
-    ## i.e. if num.outcomes==1
-    
-    cat("Results for the exposures listed on the left vs the outcome \"",
-        dimnames(x$summary.array)[[2]], "\":\n", sep = "")
-    print(x$summary.array[,1,], digits = digits, ...)
-    cat("\n")
-
-  } else if(by.exposure) {
-
-    for(i in 1:dim(x$summary.array)[1]) {
-      cat("Results for the exposure \"", dimnames(x$summary.array)[[1]][i],
-        "\" vs the outcomes listed on the left:\n", sep = "")
-      print(x$summary.array[i,,], digits = digits, ...)
-      cat("\n")
-    }
-
-  } else {
-
-    for(i in 1:dim(x$summary.array)[2]) {
-      cat("Results for the exposures listed on the left vs the outcome \"",
-          dimnames(x$summary.array)[[2]][i], "\":\n", sep = "")
-      print(x$summary.array[,i,], digits = digits, ...)
-      cat("\n")
-    }
-  }
-
-  invisible(x)
-}

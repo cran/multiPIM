@@ -1,0 +1,45 @@
+What’s new in version 1.3-1 (built on 2012-12-07)
+
+  *Added data directory with .rda files for wcgs and schisto data
+      can be loaded with data(schisto) or data(wcgs)
+  *Parallel processing of bootstrap replicates now uses parallel package
+    (distributed as part of core R as of R version 2.14.0)
+    i.e. packages multicore and rlecuyer are no longer required when
+    multiPIMboot is called with multicore = TRUE.
+  *argument rlecuyer.seed to multiPIMboot function has been replaced with the
+     argument mc.seed, which should be a single integer
+  *Added timing information to multiPIM results
+  *Added type argument to summary.multiPIM and summaries now by
+     default include breakdown of running time by g vs. Q modeling
+     and by super learner candidate in addition to the statistical
+     summary by exposure-outcome pair
+  *Added this ChangeLog file
+  *Split up file R/functions.R into three separate files by functionality:
+     -multiPIM.R: definitions of the candidate vectors, multiPIM function
+     -multiPIMboot.R: multiPIMboot function
+     -summary.R: summary.multiPIM and print.summary.multiPIM functions
+
+What’s new in version 1.2-1 (2011-11-02):
+
+  *Minor updates for compatibility with R version 2.14
+  *mutliPIMboot no longer allows for automatic detection of
+     number of cores to use when multicore = FALSE
+
+What’s new in version 1.1-2 (2011-09-20):
+
+  *Bug fix: there was an error in the formula which calculates
+     plug-in standard errors for IPCW and DR-IPCW estimators.
+     This has now been fixed.
+
+What’s new in version 1.1-1 (2011-09-14):
+
+  *New estimators: the default estimator is now TMLE.
+     Also, a G-COMP estimator is now available, as well as
+     the IPCW and DR-IPCW estimators that were available in
+     the previous version.
+  *Default for g.method has been changed from super learning
+     to main terms logistic regression. This will usually work
+     better with the new TMLE estimator.
+  *Support for factors in W.
+  *standardize argument for use with the lars and penalized
+     candidates.

@@ -41,14 +41,10 @@ This candidate uses the function \code{\link[lars]{lars}} from the package \bold
 These candidates perform standard main terms logistic or linear regression, using the functions \code{\link[stats]{glm}} and \code{\link[stats]{lm}}.
 
     }
-%     \subsection{randomForest.bin and randomForest.cont}{
 
-% These candidates use the function \code{\link[randomForest]{randomForest}} from the package \bold{randomForest}. Note that these candidates have not been included among the default candidates due to several issues which may lead to poor performance of the PIM estimator, such as e.g. the possibility of overfitting.
-
-%     }
     \subsection{rpart.bin and rpart.cont}{
 
-These candidates use the function \code{\link[rpart]{rpart}} from the package \bold{rpart}. They are not included as default candidates since their performance is very poor when predictor variables are continuous. It is not recommended to use these candidates if \code{W} contains any continuous variables.
+These candidates use the function \code{\link[rpart]{rpart}} from the package \bold{rpart}. They are not included as default candidates since methods such as this, which are based on an individual tree, have many drawbacks, see e.g. Hastie, Tibshirani and Friedman (2009, section 9.2).
 
     }
 }
@@ -103,6 +99,11 @@ multiPIM:
 
 Ritter, Stephan J.,  Jewell, Nicholas P. and Hubbard, Alan E. (2011) \dQuote{Variable Importance Analysis with the multiPIM R Package.} \emph{U.C. Berkeley Division of Biostatistics Working Paper Series}, Working Paper 286.
 \url{http://www.bepress.com/ucbbiostat/paper286}
+
+General Machine Learning Reference:
+
+Hastie, T, Tibshirani, R and Friedman, J (2009). \emph{The Elements of Statistical Learning}. Springer, 2nd edition.
+ISBN: 0387848576
 
 lars:
 

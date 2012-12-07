@@ -7,7 +7,7 @@
              id = 1:nrow(Y),
              multicore = FALSE,
              mc.num.jobs,
-             rlecuyer.seed = rep(12345, 6),
+             mc.seed = 123,
              estimator = c("TMLE", "DR-IPCW", "IPCW", "G-COMP"),
              g.method = "main.terms.logistic", g.sl.cands = NULL,
              g.num.folds = NULL, g.num.splits = NULL,
@@ -28,9 +28,9 @@
   \item{W}{an optional data frame containing possible confounders of the effects of the variables in \code{A} on the variables in \code{Y}. No effect measures will be calculated for these variables. May contain numeric (integer or double), or factor values. Must be left as \code{NULL} if not required. If not NULL, must have unique names.}
   \item{times}{single integer greater than or equal to 2. The number of bootstrap replicates of \code{Y}, \code{A} and \code{W} to generate and pass to \code{\link{multiPIM}}.}
   \item{id}{vector which identifies clusters. If obervations i and j are in the same cluster, then \code{id[i]} should be equal to \code{id[j]}. Bootstrapping will be carried out by sampling with replacement from the clusters. Keeping the default value will result in sampling with replacement from the observations (i.e. no clustering).}
-  \item{multicore}{logical value indicting whether bootstrapping should be done using multiple simultaneous jobs (requires that CRAN packages \emph{multicore} and \emph{rlecuyer} are installed).}
+  \item{multicore}{logical value indicting whether bootstrapping should be done using multiple simultaneous jobs (as of multiPIM version 1.3-1 this requires the \emph{\link[parallel]{parallel}} package, which is distributed with R version 2.14.0 or later. For earlier versions of multiPIM, this feature relied on  CRAN packages \emph{multicore} and \emph{rlecuyer}.}
   \item{mc.num.jobs}{number of simultaneous multicore jobs, e.g. if you want to use a quad core processor with hyperthreading, use \code{mc.num.jobs = 8}. This must be specified whenever \code{multicore} is true. Automatic detection of the number of cores is no longer available.}
-  \item{rlecuyer.seed}{vector of length 6 defining a seed to set for the \emph{rlecuyer} package (see \code{\link[rlecuyer]{.lec.SetPackageSeed}}). Will be ignored if \code{multicore} is \code{FALSE}. If \code{mulicore} is \code{FALSE}, one \dQuote{should} (depending on the candidates used) be able to get reprodicible results by setting the seed normally (with \code{\link[base]{set.seed}}) prior to running multiPIMboot.}
+  \item{mc.seed}{integer value with which to seed the RNG when using parallel processing (internally, \code{\link[base]{RNGkind}} will be called to set the RNG to \code{"L'Ecuyer-CMRG"}). Will be ignored if \code{multicore} is \code{FALSE}. If \code{mulicore} is \code{FALSE}, one \dQuote{should} (depending on the candidates used) be able to get reprodicible results by setting the seed normally (with \code{\link[base]{set.seed}}) prior to running multiPIMboot.}
   \item{estimator}{the estimator to be used. The default is \code{"TMLE"}, for the targeted maximum likelihood estimator. Alternatively, one may specify \code{"DR-IPCW"}, for the Double-Robust Inverse Probability of Censoring-Weighted estimator, or \code{"IPCW"}, for the regular IPCW estimator. If the regular IPCW estimator is selected, all arguments which begin with the letter Q are ignored, since only g (the regression of each exposure on possible confounders) needs to be modeled in this case.}
   \item{g.method}{a length one character vector indicating the regression method to use in modelling g. The default value, \code{"main.terms.logistic"}, is meant to be used with the default TMLE estimator. If a different estimator is used, it is recommended to use super learning by specifying \code{"sl"}. In this case, the arguments \code{g.sl.cands}, \code{g.num.folds} and \code{g.num.splits} must also be specified. Other possible values for the \code{g.method} argument are: one of the elements of the vector \code{\link{all.bin.cands}}, or, if \code{extra.cands} is supplied, one of the names of the \code{extra.cands} list of functions. Ignored if \code{estimator} is \code{"G-COMP"}.}
   \item{g.sl.cands}{character vector of length \eqn{\geq 2}{>= 2} indicating the candidate algorithms that the super learner fits for g should use. The possible values may be taken from the vector \code{\link{all.bin.cands}}, or from the names of the \code{extra.cands} list of functions, if it is supplied. Ignored if \code{estimator} is \code{"G-COMP"}. or if \code{g.method} is not \code{"sl"}. NOTE: The TMLE estimator is recommended, but if one is using either of the IPCW estimators, a reasonable choice is to specify \code{g.method = "sl"} and \code{g.sl.cands = default.bin.cands}.}
@@ -54,7 +54,9 @@
 \details{
 Bootstrap standard errors can be calculated by running the \code{summary} function on the \code{multiPIMboot} result (see \code{link{summary.multiPIM}}).
 
-For more details on the arguments, see the details section for \code{\link{multiPIM}}.
+As of \emph{multiPIM} version 1.3-1, support for multicore processing is through R's \emph{parallel} package (distributed with R as of version 2.14.0).
+
+For more details on how to use the arguments, see the details section for \code{\link{multiPIM}}.
 }
 
 \value{
@@ -86,6 +88,15 @@ Returns an object of class \code{"multiPIM"} which is identical to the object re
   \item{truncation.occured}{logical value indicating whether it was necessary to trunctate. \code{FALSE} when \code{truncate} is \code{FALSE}. Will be set to NA if estimator was \code{"G-COMP"}.}
   \item{standardize}{the value of the \code{standardize} argument.}
   \item{boot.param.array}{a three dimensional array with \code{dim} attribute equal to \code{c(times, ncol(A), ncol(Y))} containing the corresponding parameter estimate for each bootstrap replicatate-exposure-outcome trio. Also has an informative \code{dimnames} attribute for easy printing.}
+  \item{main.time}{time (in seconds) taken for main run of multiPIM on the original data.}
+  \item{g.time}{time in seconds taken for running g models.}
+  \item{Q.time}{time in seconds taken for running Q models.}
+  \item{g.sl.time}{if g.method is "sl", time in seconds taken for running cross-validation of g models.}
+  \item{Q.sl.time}{if Q.method is "sl", time in seconds taken for running cross-validation of Q models.}
+  \item{g.sl.cand.times}{if g.method is "sl", named vector containing time taken, with each element corresponding to a super learner candidate for g.}
+  \item{Q.sl.cand.times}{if Q.method is "sl", named vector containing time taken, with each element corresponding to a super learner candidate for Q.}
+
+Note that all timing results apply only to the first run of code{link{multiPIM}} on the original data, not the subsequent bootstrap runs.
 }
 
 \author{Stephan Ritter, with design contributions from Alan Hubbard and Nicholas Jewell.}

@@ -166,6 +166,13 @@ Returns an object of class \code{"multiPIM"} with the following elements:
   \item{truncation.occured}{logical value indicating whether it was necessary to trunctate. \code{FALSE} when \code{truncate} is \code{FALSE}. Will be set to NA if estimator was \code{"G-COMP"}.}
   \item{standardize}{the value of the \code{standardize} argument.}
   \item{boot.param.array}{this slot will be \code{NULL} for objects returned by the \code{multiPIM} function. See \code{\link{multiPIMboot}} for details on what this slot is actually used for.}
+  \item{main.time}{total time (in seconds) taken to generate this multiPIM result.}
+  \item{g.time}{time in seconds taken for running g models.}
+  \item{Q.time}{time in seconds taken for running Q models.}
+  \item{g.sl.time}{if g.method is "sl", time in seconds taken for running cross-validation of g models.}
+  \item{Q.sl.time}{if Q.method is "sl", time in seconds taken for running cross-validation of Q models.}
+  \item{g.sl.cand.times}{if g.method is "sl", named vector containing time taken, with each element corresponding to a super learner candidate for g.}
+  \item{Q.sl.cand.times}{if Q.method is "sl", named vector containing time taken, with each element corresponding to a super learner candidate for Q.}
 }
 
 \author{Stephan Ritter, with design contributions from Alan Hubbard and Nicholas Jewell.}
