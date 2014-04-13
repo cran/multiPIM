@@ -178,8 +178,8 @@ Returns an object of class \code{"multiPIM"} with the following elements:
 \author{Stephan Ritter, with design contributions from Alan Hubbard and Nicholas Jewell.}
 
 \references{
-Ritter, Stephan J.,  Jewell, Nicholas P. and Hubbard, Alan E. (2011) \dQuote{Variable Importance Analysis with the multiPIM R Package.} \emph{U.C. Berkeley Division of Biostatistics Working Paper Series}, Working Paper 286.
-\url{http://www.bepress.com/ucbbiostat/paper286}
+Ritter, Stephan J.,  Jewell, Nicholas P. and Hubbard, Alan E. (2014) \dQuote{R Package multiPIM: A Causal Inference Approach to Variable Importance Analysis} \emph{Journal of Statistical Software} \bold{57}, 8: 1--29. 
+\url{http://www.jstatsoft.org/v57/i08/.}
 
 Hubbard, Alan E. and van der Laan, Mark J. (2008) \dQuote{Population Intervention Models in Causal Inference.} \emph{Biometrika} \bold{95}, 1: 35--47.
 

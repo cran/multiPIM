@@ -1,0 +1,21 @@
+citHeader("To cite multiPIM in publications use:")
+
+citEntry(entry = "Article",
+  title        = "{R} Package {multiPIM}: A Causal Inference Approach to Variable Importance Analysis",
+  author       = personList(as.person("Stephan J. Ritter"),
+                   as.person("Nicholas P. Jewell"),
+                   as.person("Alan E. Hubbard")),
+  journal      = "Journal of Statistical Software",
+  year         = "2014",
+  volume       = "57",
+  number       = "8",
+  pages        = "1--29",
+  url          = "http://www.jstatsoft.org/v57/i08/",
+
+  textVersion  =
+  paste("Stephan J. Ritter, Nicholas P. Jewell, Alan E. Hubbard (2014).",
+        "R Package multiPIM: A Causal Inference Approach to Variable Importance Analysis.",
+        "Journal of Statistical Software, 57(8), 1-29.",
+        "URL http://www.jstatsoft.org/v57/i08/.")
+)
+

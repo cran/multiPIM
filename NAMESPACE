@@ -1,3 +1,8 @@
+importFrom(lars, lars, cv.lars, coef.lars, predict.lars)
+import(penalized) 
+importFrom(polspline, polymars, polyclass, predict.polymars, ppolyclass)
+import(rpart)
+
 export(multiPIM, multiPIMboot, all.bin.cands, default.bin.cands, all.cont.cands, default.cont.cands)
 S3method(summary, multiPIM)
 S3method(print, summary.multiPIM)

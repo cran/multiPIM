@@ -97,8 +97,8 @@ The other slots (main.model and force.model), and setting the class of the objec
 
 multiPIM:
 
-Ritter, Stephan J.,  Jewell, Nicholas P. and Hubbard, Alan E. (2011) \dQuote{Variable Importance Analysis with the multiPIM R Package.} \emph{U.C. Berkeley Division of Biostatistics Working Paper Series}, Working Paper 286.
-\url{http://www.bepress.com/ucbbiostat/paper286}
+Ritter, Stephan J.,  Jewell, Nicholas P. and Hubbard, Alan E. (2014) \dQuote{R Package multiPIM: A Causal Inference Approach to Variable Importance Analysis} \emph{Journal of Statistical Software} \bold{57}, 8: 1--29. 
+\url{http://www.jstatsoft.org/v57/i08/.}
 
 General Machine Learning Reference:
 
