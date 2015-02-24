@@ -46,12 +46,11 @@ multiPIMboot <- function(Y, A, W = NULL,
 
   if(multicore) {
 
-    tryCatch(library(parallel), error = function(e) {
+    if(!requireNamespace("parallel", quietly = TRUE)) {
 
-      stop("multicore is TRUE, but unable to load package parallel.\n",
-           "Error message was:\n",
-           e$message)
-    })
+      stop("multicore is TRUE, but unable to load package parallel")
+
+    }
 
     ## check mc.num.jobs
 
@@ -200,14 +199,14 @@ multiPIMboot <- function(Y, A, W = NULL,
 
     ## this is needed for reproducibility
     
-    mc.reset.stream()
+    parallel::mc.reset.stream()
 
     ## start parallel jobs, then collect results
 
-    jobs <- lapply(1:mc.num.jobs, function(x) mcparallel(run.one.job(x),
+    jobs <- lapply(1:mc.num.jobs, function(x) parallel::mcparallel(run.one.job(x),
                                                        name = x))
 
-    results.list <- mccollect(jobs)
+    results.list <- parallel::mccollect(jobs)
 
     for(job.num in 1:mc.num.jobs) {
 
